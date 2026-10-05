@@ -40,7 +40,7 @@ app.post('/api/scan', upload.single('image'), async (req, res) => {
         }
         console.log(`[API] Scanning image size: ${req.file.size} bytes`);
 
-        const scanner = new RobustHexScanner({ eccLevel: 2 });
+        const scanner = new RobustHexScanner(); // complexity is detected from the image
         const result = await scanner.decodeFromBuffer(req.file.buffer);
 
         res.json(result);

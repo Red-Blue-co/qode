@@ -154,7 +154,10 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.classList.remove('loading', 'success');
     }
 
-    // --- Scanner Logic (With Auto-Scan & Snap) ---
+    // --- Scanner: live decoding in the browser ---
+    // Camera frames are decoded continuously in a Web Worker (no upload, no server).
+    // A frame is shown around the Qode while it is tracked; the text locks in once
+    // two frames in a row read the same thing.
     const cameraView = document.getElementById('camera-view');
     const uploadView = document.getElementById('upload-view');
     const modeCameraBtn = document.getElementById('mode-camera');
@@ -162,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const videoFeed = document.getElementById('video-feed');
     const snapPreview = document.getElementById('scan-snap-preview');
     const captureCanvas = document.getElementById('capture-canvas');
+    const trackCanvas = document.getElementById('track-overlay');
     const scanBtn = document.getElementById('scan-btn');
     const resultBox = document.getElementById('result-box');
     const scanResult = document.getElementById('scan-result');
@@ -169,263 +173,404 @@ document.addEventListener('DOMContentLoaded', () => {
     const dropzone = document.getElementById('dropzone');
     const uploadPreview = document.getElementById('uploaded-preview');
     const scanStatus = document.getElementById('scan-status');
+    const copyBtn = document.getElementById('copy-btn');
+    const lockRing = document.getElementById('lock-ring');
+    const decodedOverlay = document.getElementById('decoded-overlay');
+    const decodedText = document.getElementById('decoded-text');
+
+    const isScannerPage = !!(cameraView && videoFeed);
+    const TRACK_SIZE = 640;      // longest side of the small frames used for tracking
+    const READ_SIZE = 1920;      // longest side of the full frames used for reading
+    const MIN_READ_DIAMETER = 120; // px across (in a full frame) before reading is worth it
+    const LOST_AFTER = 1200;     // ms without seeing the code before starting over
 
     let activeStream = null;
-    let scanInterval = null;
-    let isScanning = false;
+    let liveRunning = false;
+    let isLocked = false;
+    let tracking = null;         // latest outline and state from the tracker
+    let shown = null;            // outline as drawn (eased toward the latest, in view px)
+    let seenAt = 0;              // last time the tracker saw the code
+    let reads = [];              // texts read from frames of the code being tracked
+    let readFrames = 0;          // full frames read for the code being tracked
+    let lastStatus = '';
 
-    // Mode Switching
+    const setStatus = (t) => {
+        if (scanStatus && t !== lastStatus) { scanStatus.innerText = t; lastStatus = t; }
+    };
+
+    // Two workers so neither waits on the other: one tracks (fast, every frame),
+    // one reads (thorough, full resolution, takes as long as it needs).
+    function makeEngine() {
+        let w = null, pending = null, id = 0;
+        if (isScannerPage && window.Worker) {
+            try {
+                w = new Worker('qode-worker.js');
+                w.onmessage = (e) => { const cb = pending; pending = null; if (cb) cb(e.data.result); };
+                w.onerror = () => { w = null; const cb = pending; pending = null; if (cb) cb(null); };
+            } catch (e) { w = null; }
+        }
+        const plain = (l) => ({ found: l.found, foundCount: l.foundCount, outline: l.outline, center: l.center, diameter: l.diameter });
+        return {
+            get busy() { return !!pending; },
+            run(type, imageData, options) {
+                return new Promise((resolve) => {
+                    pending = resolve;
+                    if (w) {
+                        w.postMessage({ id: ++id, type, width: imageData.width, height: imageData.height, buffer: imageData.data.buffer, options }, [imageData.data.buffer]);
+                        return;
+                    }
+                    // Very old browsers: decode on the page instead
+                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-decoder.js');
+                    ready.then(() => {
+                        const D = window.QodeDecoder;
+                        const r = type === 'locate' ? plain(D.locate(imageData)) : D.decode(imageData, options);
+                        const cb = pending; pending = null; cb(r);
+                    });
+                });
+            },
+        };
+    }
+    function loadScript(src) {
+        return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+    }
+    const tracker = makeEngine();
+    const reader = makeEngine();
+
+    // Mode switching
     if (modeCameraBtn && modeUploadBtn) {
         modeCameraBtn.addEventListener('click', () => switchMode('camera'));
         modeUploadBtn.addEventListener('click', () => switchMode('upload'));
-
-        if (window.location.href.includes('scanner.html')) {
-            startCamera();
-        }
+        if (isScannerPage) startCamera();
     }
 
     function switchMode(mode) {
-        if (mode === 'camera') {
-            modeCameraBtn.classList.add('active');
-            modeUploadBtn.classList.remove('active');
-            cameraView.classList.add('active');
-            uploadView.classList.remove('active');
-            scanBtn.innerHTML = '<span class="btn-text">Scan Now</span>';
-            clearLockUI();
+        const camera = mode === 'camera';
+        modeCameraBtn.classList.toggle('active', camera);
+        modeUploadBtn.classList.toggle('active', !camera);
+        cameraView.classList.toggle('active', camera);
+        uploadView.classList.toggle('active', !camera);
+        clearLock();
+        if (camera) {
+            scanBtn.innerHTML = '<span class="btn-text">Scanning live…</span>';
             startCamera();
         } else {
-            modeUploadBtn.classList.add('active');
-            modeCameraBtn.classList.remove('active');
-            uploadView.classList.add('active');
-            cameraView.classList.remove('active');
             stopCamera();
-            clearLockUI();
-            scanBtn.innerHTML = '<span class="btn-text">Process File</span>';
+            scanBtn.innerHTML = '<span class="btn-text">Read Image</span>';
+            setStatus('Upload a photo or screenshot of a Qode.');
         }
     }
 
-    function clearLockUI() {
-        isLocked = false;
-        lastPayload = null;
-        if (snapPreview) { snapPreview.classList.add('hidden'); snapPreview.src = ''; }
-        const ring = document.getElementById('lock-ring');
-        const ov = document.getElementById('decoded-overlay');
-        const tx = document.getElementById('decoded-text');
-        if (ring) ring.classList.add('hidden');
-        if (ov) ov.classList.add('hidden');
-        if (tx) tx.textContent = '';
-        if (cameraView) cameraView.classList.remove('locked');
-    }
-
     async function startCamera() {
+        if (activeStream) { startLive(); return; }
         try {
-            if (activeStream) return;
-            activeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            activeStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+                audio: false,
+            });
             videoFeed.srcObject = activeStream;
-            videoFeed.play();
-            if (scanStatus) scanStatus.innerText = "Camera active. Point at a Qode.";
-            startAutoScan();
+            await videoFeed.play().catch(() => {});
+            cameraView.classList.add('live');
+            if (scanBtn) scanBtn.innerHTML = '<span class="btn-text">Scanning live…</span>';
+            setStatus('Point the camera at a Qode.');
+            startLive();
         } catch (err) {
-            console.error("Camera Error:", err);
-            if (scanStatus) scanStatus.innerText = "Camera access denied.";
+            console.error('Camera Error:', err);
+            setStatus(location.protocol === 'https:' || location.hostname === 'localhost'
+                ? 'Camera access denied. You can upload an image instead.'
+                : 'The camera needs HTTPS. You can upload an image instead.');
         }
     }
 
     function stopCamera() {
-        stopAutoScan();
+        liveRunning = false;
         if (activeStream) {
-            activeStream.getTracks().forEach(track => track.stop());
+            activeStream.getTracks().forEach((t) => t.stop());
             videoFeed.srcObject = null;
             activeStream = null;
         }
+        cameraView.classList.remove('live');
+        forgetCode();
+        drawOverlay();
     }
 
-    function startAutoScan() {
-        if (scanInterval) clearInterval(scanInterval);
-        isScanning = true;
-        scanInterval = setInterval(() => {
-            if (!isScanning) return;
-            if (videoFeed.readyState === videoFeed.HAVE_ENOUGH_DATA) {
-                captureFrameAndScan();
-            }
-        }, 500);
+    function startLive() {
+        if (liveRunning) return;
+        liveRunning = true;
+        requestAnimationFrame(liveLoop);
     }
 
-    function stopAutoScan() {
-        clearInterval(scanInterval);
-        isScanning = false;
-        if (scanBtn) scanBtn.classList.remove('loading');
+    // Current video frame, scaled so its longest side is at most maxSide
+    const trackBuffer = document.createElement('canvas');
+    function grab(canvas, maxSide) {
+        const vw = videoFeed.videoWidth, vh = videoFeed.videoHeight;
+        if (!vw || !vh) return null;
+        const k = Math.min(1, maxSide / Math.max(vw, vh));
+        const w = Math.round(vw * k), h = Math.round(vh * k);
+        if (canvas.width !== w) canvas.width = w;
+        if (canvas.height !== h) canvas.height = h;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(videoFeed, 0, 0, w, h);
+        return ctx.getImageData(0, 0, w, h);
     }
 
-    const lockRing = document.getElementById('lock-ring');
-    const decodedOverlay = document.getElementById('decoded-overlay');
-    const decodedText = document.getElementById('decoded-text');
-    let isLocked = false;
-    let scanInFlight = false;
-    let lastPayload = null; // require two consecutive identical decodes to lock
+    function forgetCode() {
+        tracking = null;
+        reads = [];
+        readFrames = 0;
+    }
 
-    async function captureFrameAndScan() {
-        if (isLocked || scanInFlight) return;
-        if (!videoFeed.videoWidth || !videoFeed.videoHeight) return;
+    function liveLoop() {
+        if (!liveRunning) return;
+        requestAnimationFrame(liveLoop);
+        drawOverlay();
+        if (isLocked || videoFeed.readyState < videoFeed.HAVE_CURRENT_DATA) return;
+        if (!tracker.busy) track();
+        // Keep reading full frames for as long as the code stays in view
+        if (!reader.busy && tracking && tracking.readable && performance.now() - seenAt < 400) read();
+    }
 
-        // Downscale to max 800 on longest side (bandwidth + CPU)
-        const maxDim = 800;
-        const ratio = Math.min(1, maxDim / Math.max(videoFeed.videoWidth, videoFeed.videoHeight));
-        const targetW = Math.round(videoFeed.videoWidth * ratio);
-        const targetH = Math.round(videoFeed.videoHeight * ratio);
-
-        captureCanvas.width = targetW;
-        captureCanvas.height = targetH;
-        captureCanvas.getContext('2d').drawImage(videoFeed, 0, 0, targetW, targetH);
-
-        scanInFlight = true;
-        captureCanvas.toBlob(async (blob) => {
-            if (!blob) { scanInFlight = false; return; }
-            const formData = new FormData();
-            formData.append('image', blob);
-
-            try {
-                const response = await fetch('/api/scan', { method: 'POST', body: formData });
-                const data = await response.json();
-
-                if (data.payload && data.meta && data.meta.aligned) {
-                    if (lastPayload === data.payload) {
-                        lockScan(data.payload);
-                        lastPayload = null;
-                    } else {
-                        lastPayload = data.payload;
-                        scanStatus.innerText = "Stabilizing Qode...";
-                    }
-                } else if (data.meta && data.meta.foundCount >= 2) {
-                    lastPayload = null;
-                    scanStatus.innerText = `Aligning Qode... (${data.meta.foundCount}/4 anchors)`;
-                } else {
-                    lastPayload = null;
-                    scanStatus.innerText = "Scanning for Qodes...";
+    // Fast pass: where is the code? Runs on small frames, many times a second.
+    function track() {
+        const frame = grab(trackBuffer, TRACK_SIZE);
+        if (!frame) return;
+        const fw = frame.width, fh = frame.height;
+        tracker.run('locate', frame).then((loc) => {
+            if (isLocked || !loc) return;
+            const now = performance.now();
+            if (!loc.found) {
+                if (now - seenAt > LOST_AFTER) {
+                    if (tracking) forgetCode();
+                    setStatus('Point the camera at a Qode.');
                 }
-            } catch (err) { /* transient network errors OK */ }
-            finally { scanInFlight = false; }
-        }, 'image/png');
+                return;
+            }
+            seenAt = now;
+            const fullDiameter = loc.diameter * (videoFeed.videoWidth / fw);
+            const readable = loc.foundCount >= 3 && fullDiameter >= MIN_READ_DIAMETER;
+            tracking = { outline: loc.outline, fw, fh, readable, state: readable ? 'reading' : 'tracking' };
+            if (loc.foundCount < 3) setStatus('Fit the whole Qode in view.');
+            else if (!readable) setStatus('Move closer.');
+            else setStatus(readFrames ? `Reading… (${readFrames} ${readFrames === 1 ? 'frame' : 'frames'})` : 'Reading…');
+        });
     }
 
+    // Thorough pass: read the text from a full-resolution frame. Each frame is read
+    // on its own; the text locks once two frames agree (three for codes without copies).
+    function read() {
+        const frame = grab(captureCanvas, READ_SIZE);
+        if (!frame) return;
+        const fw = frame.width, fh = frame.height;
+        reader.run('decode', frame, { strictness: 0.75 }).then((r) => {
+            if (isLocked || !r || !tracking) return;
+            readFrames++;
+            if (!r.success) return;
+            reads.push(r.payload);
+            const agree = reads.filter((t) => t === r.payload).length;
+            if (agree >= (r.meta.ecc === 1 ? 3 : 2)) {
+                tracking = { outline: r.meta.outline, fw, fh, readable: true, state: 'read' };
+                shown = null;
+                lockScan(r.payload);
+            }
+        });
+    }
+
+    // --- Tracking overlay (canvas over the video, matching object-fit: cover) ---
+    function overlayContext() {
+        if (!trackCanvas) return null;
+        const dpr = window.devicePixelRatio || 1;
+        const cw = trackCanvas.clientWidth, ch = trackCanvas.clientHeight;
+        if (trackCanvas.width !== Math.round(cw * dpr) || trackCanvas.height !== Math.round(ch * dpr)) {
+            trackCanvas.width = Math.round(cw * dpr);
+            trackCanvas.height = Math.round(ch * dpr);
+        }
+        const ctx = trackCanvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, cw, ch);
+        return { ctx, cw, ch };
+    }
+
+    function frameToView(p, fw, fh, cw, ch) {
+        const vw = videoFeed.videoWidth || fw, vh = videoFeed.videoHeight || fh;
+        const s = Math.max(cw / vw, ch / vh);
+        const ox = (cw - vw * s) / 2, oy = (ch - vh * s) / 2;
+        return { x: p.x * (vw / fw) * s + ox, y: p.y * (vh / fh) * s + oy };
+    }
+
+    const COLORS = { tracking: '255, 197, 49', reading: '61, 160, 255', read: '62, 220, 132' };
+
+    function drawOverlay() {
+        const o = overlayContext();
+        if (!o) return;
+        const lost = !isLocked && performance.now() - seenAt > 350;
+        if (!tracking || !tracking.outline) { shown = null; return; }
+        const target = tracking.outline.map((p) => frameToView(p, tracking.fw, tracking.fh, o.cw, o.ch));
+        // Ease toward the latest position so the frame glides instead of jumping
+        shown = shown && shown.length === target.length
+            ? shown.map((p, i) => ({ x: p.x + (target[i].x - p.x) * 0.45, y: p.y + (target[i].y - p.y) * 0.45 }))
+            : target;
+        const { ctx } = o;
+        const color = COLORS[tracking.state] || COLORS.tracking;
+        const alpha = lost ? 0.35 : 1;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = `rgba(${color}, ${0.95 * alpha})`;
+        ctx.shadowColor = `rgba(${color}, ${0.8 * alpha})`;
+        ctx.shadowBlur = 14;
+        // While reading, the frame "scans" with a moving dash
+        if (tracking.state === 'reading' && !lost) {
+            ctx.setLineDash([14, 10]);
+            ctx.lineDashOffset = -(performance.now() / 25) % 24;
+        } else {
+            ctx.setLineDash([]);
+        }
+        ctx.beginPath();
+        shown.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
+    }
+
+    // --- Lock (result found) ---
     function lockScan(payload) {
         if (isLocked) return;
         isLocked = true;
 
-        // Freeze the scanned frame over the live video
-        snapPreview.src = captureCanvas.toDataURL('image/png');
-        snapPreview.classList.remove('hidden');
-
-        // Show lock ring + decoded text overlay
+        // Freeze the frame the text was read from
+        if (snapPreview) {
+            snapPreview.src = captureCanvas.toDataURL('image/jpeg', 0.85);
+            snapPreview.classList.remove('hidden');
+        }
         if (lockRing) lockRing.classList.remove('hidden');
         if (decodedText) decodedText.textContent = payload;
         if (decodedOverlay) decodedOverlay.classList.remove('hidden');
 
-        // Flash the container
         const container = document.querySelector('.scanner-container.active');
         if (container) {
             container.classList.remove('snap-flash');
             void container.offsetWidth;
-            container.classList.add('snap-flash');
-            container.classList.add('locked');
+            container.classList.add('snap-flash', 'locked');
         }
-
-        // Side panel
-        scanResult.value = payload;
-        resultBox.classList.remove('hidden');
-        scanStatus.innerText = "Qode locked. Move the camera freely.";
+        showResult(payload);
+        setStatus('Qode read. Tap "Scan Again" for the next one.');
         if (scanBtn) scanBtn.innerHTML = '<span class="btn-text">Scan Again</span>';
-
-        stopAutoScan();
         try { videoFeed.pause(); } catch (e) {}
-        if (navigator.vibrate) navigator.vibrate(200);
+        // Browsers only allow vibration after the person has tapped the page
+        if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate(120);
     }
 
-    function resetLock() {
+    function clearLock() {
         isLocked = false;
-        lastPayload = null;
-        snapPreview.classList.add('hidden');
-        snapPreview.src = '';
+        forgetCode();
+        if (snapPreview) { snapPreview.classList.add('hidden'); snapPreview.src = ''; }
         if (lockRing) lockRing.classList.add('hidden');
         if (decodedOverlay) decodedOverlay.classList.add('hidden');
         if (decodedText) decodedText.textContent = '';
-        resultBox.classList.add('hidden');
-        scanResult.value = "";
-        const container = document.querySelector('.scanner-container.active');
-        if (container) container.classList.remove('locked');
-        scanBtn.innerHTML = '<span class="btn-text">Scan Now</span>';
-        scanStatus.innerText = "Rescanning...";
+        if (resultBox) resultBox.classList.add('hidden');
+        if (scanResult) scanResult.value = '';
+        document.querySelectorAll('.scanner-container').forEach((c) => c.classList.remove('locked'));
+        drawOverlay();
+    }
+
+    function resetLock() {
+        clearLock();
+        if (scanBtn) scanBtn.innerHTML = '<span class="btn-text">Scanning live…</span>';
+        setStatus('Point the camera at a Qode.');
         try { videoFeed.play(); } catch (e) {}
-        startAutoScan();
+        startLive();
+    }
+
+    function showResult(text) {
+        if (scanResult) scanResult.value = text;
+        if (resultBox) resultBox.classList.remove('hidden');
+    }
+
+    // --- Upload: decoded in the browser too ---
+    async function readUpload(file) {
+        setStatus('Reading image…');
+        if (scanBtn) scanBtn.classList.add('loading');
+        try {
+            const url = URL.createObjectURL(file);
+            const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+            const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+            const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+            captureCanvas.width = w;
+            captureCanvas.height = h;
+            const ctx = captureCanvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(img, 0, 0, w, h);
+            URL.revokeObjectURL(url);
+            // A single image gets no second read, so it must be clear on its own
+            const result = (await reader.run('decode', ctx.getImageData(0, 0, w, h), { strictness: 1, minDiameter: 100 })) || {};
+            if (result.success) {
+                showResult(result.payload);
+                setStatus('Qode read.');
+            } else {
+                const why = {
+                    'No Qode anchors found': 'No Qode found in this image.',
+                    'Move closer': 'The Qode is too small in this image. Crop closer or use a larger photo.',
+                    'Need all anchors in view': 'Part of the Qode is cut off.',
+                    'Could not read the dots yet': 'The Qode is too blurry or dark to read reliably.',
+                }[result.reason];
+                setStatus(why || 'Could not read this image.');
+            }
+        } catch (e) {
+            setStatus('Could not open this image.');
+        } finally {
+            if (scanBtn) scanBtn.classList.remove('loading');
+        }
     }
 
     if (scanBtn) {
-        scanBtn.addEventListener('click', async () => {
-            if (cameraView.classList.contains('active')) {
-                if (isLocked) {
-                    resetLock();
-                } else {
-                    if (!videoFeed.srcObject) return;
-                    scanBtn.classList.add('loading');
-                    await captureFrameAndScan();
-                    scanBtn.classList.remove('loading');
-                }
+        scanBtn.addEventListener('click', () => {
+            if (cameraView && cameraView.classList.contains('active')) {
+                if (isLocked) resetLock();
+                else if (!activeStream) startCamera();
+            } else if (fileInput && fileInput.files[0]) {
+                readUpload(fileInput.files[0]);
             } else {
-                // Upload Mode
-                if (!fileInput.files[0]) {
-                    scanStatus.innerText = "Please upload an image first.";
-                    return;
-                }
-                scanStatus.innerText = "Processing File...";
-                scanBtn.classList.add('loading');
-                const formData = new FormData();
-                formData.append('image', fileInput.files[0]);
-                try {
-                    const response = await fetch('/api/scan', { method: 'POST', body: formData });
-                    const data = await response.json();
-                    scanBtn.classList.remove('loading');
-                    if (data.payload) {
-                        scanResult.value = data.payload;
-                        resultBox.classList.remove('hidden');
-                        scanStatus.innerText = "Qode Decoded.";
-                    } else {
-                        scanStatus.innerText = "No Qode found.";
-                    }
-                } catch (e) {
-                    scanBtn.classList.remove('loading');
-                    scanStatus.innerText = "Error processing file.";
-                }
+                setStatus('Upload an image first.');
             }
         });
     }
 
-    if (dropzone) {
-        dropzone.addEventListener('click', () => fileInput.click());
-        dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropzone.classList.add('dragover');
+    if (copyBtn && scanResult) {
+        copyBtn.addEventListener('click', async () => {
+            if (!scanResult.value) return;
+            try { await navigator.clipboard.writeText(scanResult.value); }
+            catch (e) { scanResult.select(); document.execCommand('copy'); }
+            const label = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => { copyBtn.textContent = label; }, 1500);
         });
+    }
+
+    if (dropzone && fileInput) {
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
         dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
         dropzone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropzone.classList.remove('dragover');
-            if (e.dataTransfer.files.length) {
-                fileInput.files = e.dataTransfer.files;
-                handleFileSelect();
-            }
+            if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; handleFileSelect(); }
         });
         fileInput.addEventListener('change', handleFileSelect);
         function handleFileSelect() {
             const file = fileInput.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    uploadPreview.src = e.target.result;
-                    uploadPreview.classList.remove('hidden');
-                    dropzone.classList.add('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadPreview.src = e.target.result;
+                uploadPreview.classList.remove('hidden');
+                dropzone.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+            readUpload(file); // read straight away, no extra click
         }
     }
+
+    // Stop the camera when the tab is hidden, resume when it comes back
+    document.addEventListener('visibilitychange', () => {
+        if (!isScannerPage || !cameraView.classList.contains('active')) return;
+        if (document.hidden) stopCamera();
+        else if (!isLocked) startCamera();
+    });
 });

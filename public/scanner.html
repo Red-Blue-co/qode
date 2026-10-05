@@ -58,6 +58,8 @@
                     <div class="focus-arc br"></div>
                 </div>
                 <video id="video-feed" playsinline muted></video>
+                <!-- Live tracking outline drawn over the camera image -->
+                <canvas id="track-overlay" class="track-overlay" aria-hidden="true"></canvas>
                 <!-- Success Capture Preview (Google Lens Style) -->
                 <img id="scan-snap-preview" class="hidden" alt="Captured Qode">
                 <!-- Lock ring shown when code is captured -->
@@ -83,7 +85,7 @@
             <!-- Action Button -->
             <div class="actions center" style="margin-top: 2rem;">
                 <button id="scan-btn" class="btn-save">
-                    <span class="btn-text">Scan Now</span>
+                    <span class="btn-text">Scanning live…</span>
                 </button>
             </div>
 

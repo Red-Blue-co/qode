@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let w = null, pending = null, id = 0;
         if (isScannerPage && window.Worker) {
             try {
-                w = new Worker('qode-worker.js?v=3');
+                w = new Worker('qode-worker.js?v=5');
                 w.onmessage = (e) => { const cb = pending; pending = null; if (cb) cb(e.data.result); };
                 w.onerror = () => { w = null; const cb = pending; pending = null; if (cb) cb(null); };
             } catch (e) { w = null; }
@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
                     // Very old browsers: decode on the page instead
-                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-decoder.js?v=3');
+                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-decoder.js?v=5');
                     ready.then(() => {
                         const D = window.QodeDecoder;
                         const r = type === 'locate' ? plain(D.locate(imageData)) : D.decode(imageData, options);
@@ -325,8 +325,10 @@ document.addEventListener('DOMContentLoaded', () => {
         drawOverlay();
         if (isLocked || videoFeed.readyState < videoFeed.HAVE_CURRENT_DATA) return;
         if (!tracker.busy) track();
-        // Keep reading full frames for as long as the code stays in view
-        if (!reader.busy && tracking && tracking.readable && performance.now() - seenAt < 400) read();
+        // Keep reading full frames while the code is in view. Before the tracker has
+        // found anything, read anyway: the first frame may already be readable.
+        const inView = tracking ? tracking.readable && performance.now() - seenAt < 400 : true;
+        if (!reader.busy && inView) read();
     }
 
     // Fast pass: where is the code? Runs on small frames, many times a second.
@@ -355,18 +357,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Thorough pass: read the text from a full-resolution frame. Each frame is read
-    // on its own; the text locks once two frames agree (three for codes without copies).
+    // on its own; the text locks once two frames agree (three for codes without copies),
+    // or at once when a single read is very clear.
     function read() {
         const frame = grab(captureCanvas, READ_SIZE);
         if (!frame) return;
         const fw = frame.width, fh = frame.height;
         reader.run('decode', frame, { strictness: 0.75 }).then((r) => {
-            if (isLocked || !r || !tracking) return;
+            if (isLocked || !r) return;
+            if (!r.success) { if (tracking) readFrames++; return; }
             readFrames++;
-            if (!r.success) return;
             reads.push(r.payload);
             const agree = reads.filter((t) => t === r.payload).length;
-            if (agree >= (r.meta.ecc === 1 ? 3 : 2)) {
+            // A very clear read of a code with copies needs no second frame
+            const sure = r.meta.firstChoice && r.meta.ecc >= 2 && r.meta.confidence >= 0.9;
+            if (sure || agree >= (r.meta.ecc === 1 ? 3 : 2)) {
                 tracking = { outline: r.meta.outline, fw, fh, readable: true, state: 'read' };
                 shown = null;
                 lockScan(r.payload);

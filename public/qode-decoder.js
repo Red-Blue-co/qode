@@ -798,6 +798,8 @@
         anchors: loc.anchors,
         aligned: true,
         method: best.kind,
+        mapsAgree: best.maps || 1,
+        firstChoice: best.firstChoice !== false,
         ecc: best.ecc,
         margin: Math.round(best.minMargin * 10) / 10,
         confidence: Math.round(Math.min(1, best.minMargin / (NEED[best.ecc] * 4)) * 100) / 100,
@@ -843,7 +845,7 @@
       // A single image (an upload) has no second frame to confirm it, so a text read
       // only by a partial mapping of a second-choice set needs another mapping to agree
       if (single && ci > 0 && pick && pick !== persp && votes.get(pick.r.text) < 2) pick = null;
-      if (pick) { best = pick.r; bestMap = pick.map; bestLoc = cand; break; }
+      if (pick) { best = { ...pick.r, maps: votes.get(pick.r.text), firstChoice: ci === 0 }; bestMap = pick.map; bestLoc = cand; break; }
     }
     if (!best) return failure(loc.foundCount < 4 ? 'Need all anchors in view' : 'Could not read the dots yet', loc);
     return success(best, { ...loc, anchors: bestLoc.anchors, foundCount: bestLoc.foundCount }, bestMap);

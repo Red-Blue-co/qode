@@ -1,7 +1,7 @@
 // Runs the decoder off the main thread so the camera view stays smooth.
 //   { type: 'locate' } -> where the code is (fast, used for tracking every frame)
 //   { type: 'decode' } -> read the text from a full-resolution frame (thorough)
-importScripts('qode-decoder.js?v=3');
+importScripts('qode-decoder.js?v=5');
 
 self.onmessage = (e) => {
   const { id, type, width, height, buffer, options } = e.data;

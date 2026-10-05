@@ -198,13 +198,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scanStatus && t !== lastStatus) { scanStatus.innerText = t; lastStatus = t; }
     };
 
+    // Open the scanner with ?debug to see timings on the device itself
+    const debugBox = /[?&]debug\b/.test(location.search) && scanStatus ? document.createElement('pre') : null;
+    const stats = { track: 0, tracks: 0, grab: 0, read: 0, ok: 0, fail: 0, why: '', last: '' };
+    if (debugBox) {
+        debugBox.style.cssText = 'font-size:11px;line-height:1.4;color:#9fe;white-space:pre-wrap;margin-top:8px;text-align:left';
+        scanStatus.after(debugBox);
+        setInterval(() => {
+            debugBox.textContent = [
+                `video ${videoFeed.videoWidth}x${videoFeed.videoHeight}`,
+                `track ${stats.track} ms (${stats.tracks} done)`,
+                `grab ${stats.grab} ms · read ${stats.read} ms`,
+                `reads ok ${stats.ok} · failed ${stats.fail}${stats.why ? ' (' + stats.why + ')' : ''}`,
+                `last ok: ${stats.last}`,
+            ].join('\n');
+        }, 300);
+    }
+
     // Two workers so neither waits on the other: one tracks (fast, every frame),
     // one reads (thorough, full resolution, takes as long as it needs).
     function makeEngine() {
         let w = null, pending = null, id = 0;
         if (isScannerPage && window.Worker) {
             try {
-                w = new Worker('qode-worker.js?v=5');
+                w = new Worker('qode-worker.js?v=6');
                 w.onmessage = (e) => { const cb = pending; pending = null; if (cb) cb(e.data.result); };
                 w.onerror = () => { w = null; const cb = pending; pending = null; if (cb) cb(null); };
             } catch (e) { w = null; }
@@ -220,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
                     // Very old browsers: decode on the page instead
-                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-decoder.js?v=5');
+                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-decoder.js?v=6');
                     ready.then(() => {
                         const D = window.QodeDecoder;
                         const r = type === 'locate' ? plain(D.locate(imageData)) : D.decode(imageData, options);
@@ -337,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!frame) return;
         const fw = frame.width, fh = frame.height;
         tracker.run('locate', frame).then((loc) => {
+            if (loc) { stats.track = loc.ms; stats.tracks++; }
             if (isLocked || !loc) return;
             const now = performance.now();
             if (!loc.found) {
@@ -360,10 +378,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // on its own; the text locks once two frames agree (three for codes without copies),
     // or at once when a single read is very clear.
     function read() {
+        const t0 = performance.now();
         const frame = grab(captureCanvas, READ_SIZE);
         if (!frame) return;
+        stats.grab = Math.round(performance.now() - t0);
         const fw = frame.width, fh = frame.height;
         reader.run('decode', frame, { strictness: 0.75 }).then((r) => {
+            if (r) {
+                stats.read = r.ms;
+                if (r.success) { stats.ok++; stats.last = `${r.meta.method} ecc${r.meta.ecc} conf ${r.meta.confidence}${r.meta.firstChoice ? '' : ' (2nd set)'}`; }
+                else { stats.fail++; stats.why = r.reason; }
+            }
             if (isLocked || !r) return;
             if (!r.success) { if (tracking) readFrames++; return; }
             readFrames++;

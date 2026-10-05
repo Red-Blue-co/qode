@@ -62,28 +62,73 @@
     return { x: SIZE / 2 + ANCHOR_CENTROID_R * Math.cos(a), y: SIZE / 2 + ANCHOR_CENTROID_R * Math.sin(a) };
   }
 
-  // --- 1. Anchor detection (adapts to exposure) ---
+  // --- 1. Anchor detection (adapts to exposure and camera colour shifts) ---
 
-  function hueName(r, g, b, floor) {
+  // Phone cameras shift the arc colours (red can look orange, blue can look cyan),
+  // so the hue bands are wide and overlap; the shape check below sorts them out.
+  const BANDS = {
+    red: (h) => h >= 330 || h < 40,
+    yellow: (h) => h >= 30 && h < 80,
+    green: (h) => h >= 80 && h < 172,
+    blue: (h) => h >= 172 && h < 262,
+  };
+
+  function hueOf(r, g, b, floor) {
     const max = r > g ? (r > b ? r : b) : (g > b ? g : b);
-    if (max < floor) return null;
+    if (max < floor) return -1;
     const min = r < g ? (r < b ? r : b) : (g < b ? g : b);
     const delta = max - min;
-    if (delta < 22 || delta < max * 0.38) return null;
+    if (delta < 22 || delta < max * 0.34) return -1;
     let h;
     if (max === r) h = (g - b) / delta;
     else if (max === g) h = (b - r) / delta + 2;
     else h = (r - g) / delta + 4;
     h *= 60;
-    if (h < 0) h += 360;
-    if (h >= 340 || h < 18) return 'red';
-    if (h >= 36 && h < 72) return 'yellow';
-    if (h >= 95 && h < 165) return 'green';
-    if (h >= 200 && h < 245) return 'blue';
-    return null;
+    return h < 0 ? h + 360 : h;
   }
 
-  function findAnchors(img) {
+  // A few dense blobs of one colour, biggest first
+  function blobs(p, cell, maxBlobs, cap) {
+    const out = [];
+    const used = new Uint8Array(p.length / 2);
+    for (let b = 0; b < maxBlobs; b++) {
+      const grid = new Map();
+      let best = null, bestN = 0;
+      for (let k = 0; k < p.length; k += 2) {
+        if (used[k / 2]) continue;
+        const key = Math.floor(p[k] / cell) + ',' + Math.floor(p[k + 1] / cell);
+        const v = (grid.get(key) || 0) + 1;
+        grid.set(key, v);
+        if (v > bestN) { bestN = v; best = key; }
+      }
+      if (bestN < 3) break;
+      const [gx, gy] = best.split(',').map(Number);
+      let cx = (gx + 0.5) * cell, cy = (gy + 0.5) * cell;
+      let radius = cell * 3.5, fn = 0;
+      for (let iter = 0; iter < 4; iter++) {
+        let sx = 0, sy = 0, s2 = 0;
+        fn = 0;
+        for (let k = 0; k < p.length; k += 2) {
+          if (used[k / 2]) continue;
+          const dx = p[k] - cx, dy = p[k + 1] - cy;
+          const d2 = dx * dx + dy * dy;
+          if (d2 <= radius * radius) { sx += p[k]; sy += p[k + 1]; s2 += d2; fn++; }
+        }
+        if (fn < 5) break;
+        cx = sx / fn; cy = sy / fn;
+        radius = Math.min(cell * cap, Math.max(cell, 2.6 * Math.sqrt(s2 / fn)));
+      }
+      // Claim this blob's pixels so the next pass finds a different one
+      for (let k = 0; k < p.length; k += 2) {
+        const dx = p[k] - cx, dy = p[k + 1] - cy;
+        if (dx * dx + dy * dy <= radius * radius * 1.4) used[k / 2] = 1;
+      }
+      if (fn >= 5) out.push({ x: cx, y: cy, count: fn });
+    }
+    return out;
+  }
+
+  function candidates(img) {
     const { data, width: w, height: h } = img;
     const minDim = Math.min(w, h);
     const stride = Math.max(1, Math.floor(minDim / 520));
@@ -106,44 +151,278 @@
     for (let y = 0; y < h; y += stride) {
       for (let x = 0; x < w; x += stride) {
         const i = (y * w + x) * 4;
-        const name = hueName(data[i], data[i + 1], data[i + 2], floor);
-        if (name) pts[name].push(x, y);
+        const hue = hueOf(data[i], data[i + 1], data[i + 2], floor);
+        if (hue < 0) continue;
+        for (const name of NAMES) if (BANDS[name](hue)) pts[name].push(x, y);
       }
     }
-
-    // Densest blob per colour, then refine its centre (ignores stray coloured pixels)
     const cell = Math.max(4, minDim / 28);
-    const anchors = {};
+    const out = {};
     for (const name of NAMES) {
-      const p = pts[name];
-      const count = p.length / 2;
-      if (count < 6) continue;
-      const grid = new Map();
-      let best = null, bestN = 0;
-      for (let k = 0; k < p.length; k += 2) {
-        const key = Math.floor(p[k] / cell) + ',' + Math.floor(p[k + 1] / cell);
-        const v = (grid.get(key) || 0) + 1;
-        grid.set(key, v);
-        if (v > bestN) { bestN = v; best = key; }
+      if (pts[name].length < 12) { out[name] = []; continue; }
+      // Whole blobs suit a clean view; size-capped ones keep an arc apart from
+      // other coloured things beside it (rings on a web page, lights)
+      const list = blobs(pts[name], cell, 3, Infinity);
+      for (const q of blobs(pts[name], cell, 6, 5)) {
+        if (list.every((o) => Math.hypot(o.x - q.x, o.y - q.y) > cell * 0.5)) list.push(q);
       }
-      const [gx, gy] = best.split(',').map(Number);
-      let cx = (gx + 0.5) * cell, cy = (gy + 0.5) * cell;
-      let radius = cell * 3.5, fn = 0;
-      for (let iter = 0; iter < 4; iter++) {
-        let sx = 0, sy = 0, s2 = 0;
-        fn = 0;
-        for (let k = 0; k < p.length; k += 2) {
-          const dx = p[k] - cx, dy = p[k + 1] - cy;
-          const d2 = dx * dx + dy * dy;
-          if (d2 <= radius * radius) { sx += p[k]; sy += p[k + 1]; s2 += d2; fn++; }
-        }
-        if (fn < 5) break;
-        cx = sx / fn; cy = sy / fn;
-        radius = Math.max(cell, 2.6 * Math.sqrt(s2 / fn));
-      }
-      if (fn >= 5) anchors[name] = { x: cx, y: cy, count: fn };
+      out[name] = list;
     }
-    return anchors;
+    return { cands: out, pts, minDim };
+  }
+
+  // How well do these blobs sit where a Qode's anchors would? Fits rotation + scale
+  // (no mirroring) to the reference layout; the leftover error says how Qode-like it is.
+  function fitError(set) {
+    const ns = NAMES.filter((n) => set[n]);
+    let rx = 0, ry = 0, ix = 0, iy = 0;
+    for (const n of ns) { const r = refAnchor(n); rx += r.x; ry += r.y; ix += set[n].x; iy += set[n].y; }
+    rx /= ns.length; ry /= ns.length; ix /= ns.length; iy /= ns.length;
+    let re = 0, im = 0, den = 0;
+    for (const n of ns) {
+      const r = refAnchor(n), wx = r.x - rx, wy = r.y - ry, zx = set[n].x - ix, zy = set[n].y - iy;
+      re += wx * zx + wy * zy; im += wx * zy - wy * zx; den += wx * wx + wy * wy;
+    }
+    const a = re / den, b = im / den, scale = Math.hypot(a, b);
+    let err = 0;
+    for (const n of ns) {
+      const r = refAnchor(n), wx = r.x - rx, wy = r.y - ry;
+      const px = ix + a * wx - b * wy, py = iy + b * wx + a * wy;
+      err += (px - set[n].x) ** 2 + (py - set[n].y) ** 2;
+    }
+    const spread = scale * ANCHOR_CENTROID_R;
+    return { err: Math.sqrt(err / ns.length) / Math.max(1e-6, spread), size: spread };
+  }
+
+  // --- Line patterns: red solid, blue dotted, green dashed, yellow double ---
+  // Colours shift on camera and other coloured things can sit near the code, but
+  // the patterns survive. Reads the arc's colourfulness along and across the line.
+  const ARC_START = { red: 200, blue: 290, green: 20, yellow: 110 };
+  const ARC_LEN = ANCHOR_RADIUS * 2 * ARC_HALF; // ~196 layout units
+  const ALONG = 96, ACROSS = [-9, -7.5, -6, -4.5, -3.5, -2, 0, 2, 3.5, 4.5, 6, 7.5, 9];
+
+  function arcPattern(img, map, name) {
+    const { data, width: w, height: h } = img;
+    const chroma = (p) => {
+      const x = Math.round(p.x), y = Math.round(p.y);
+      if (x < 0 || y < 0 || x >= w || y >= h) return 0;
+      const i = (y * w + x) * 4, r = data[i], g = data[i + 1], b = data[i + 2];
+      return Math.max(r, g, b) - Math.min(r, g, b);
+    };
+    const a0 = (ARC_START[name] * Math.PI) / 180, span = 2 * ARC_HALF;
+    // Pixels per layout unit here (patterns blur out when the code is small)
+    const pA = map(SIZE / 2 + ANCHOR_RADIUS * Math.cos(a0), SIZE / 2 + ANCHOR_RADIUS * Math.sin(a0));
+    const pB = map(SIZE / 2 + ANCHOR_RADIUS * Math.cos(a0 + span), SIZE / 2 + ANCHOR_RADIUS * Math.sin(a0 + span));
+    const scale = Math.hypot(pA.x - pB.x, pA.y - pB.y) / (2 * ANCHOR_RADIUS * Math.sin(ARC_HALF));
+    const along = new Float64Array(ALONG), across = new Float64Array(ACROSS.length);
+    for (let k = 0; k < ALONG; k++) {
+      const a = a0 + ((k + 0.5) / ALONG) * span, ca = Math.cos(a), sa = Math.sin(a);
+      let best = 0;
+      ACROSS.forEach((d, j) => {
+        const v = chroma(map(SIZE / 2 + (ANCHOR_RADIUS + d) * ca, SIZE / 2 + (ANCHOR_RADIUS + d) * sa));
+        across[j] += v;
+        if (Math.abs(d) <= 4.5 && v > best) best = v;
+      });
+      along[k] = best;
+    }
+    let mean = 0;
+    for (const v of along) mean += v;
+    mean /= ALONG;
+    const wave = (period) => {
+      let re = 0, im = 0;
+      for (let k = 0; k < ALONG; k++) {
+        const t = (((k + 0.5) / ALONG) * ARC_LEN * 2 * Math.PI) / period;
+        re += (along[k] - mean) * Math.cos(t); im += (along[k] - mean) * Math.sin(t);
+      }
+      return mean > 0 ? (2 * Math.hypot(re, im)) / (ALONG * mean) : 0;
+    };
+    const c = ACROSS.indexOf(0), lo = ACROSS.indexOf(-3.5), hi = ACROSS.indexOf(3.5);
+    const edge = (across[0] + across[ACROSS.length - 1]) / 2;
+    const peak = Math.max(across[lo], across[hi]) - edge;
+    return {
+      scale, strength: mean,
+      p15: wave(15), p30: wave(30),
+      dip: peak > 0 ? Math.max(0, Math.min(1.5, (across[c] - edge) / peak)) : 1,
+    };
+  }
+
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  // 0..1: how much the line where this anchor should be looks like its own pattern
+  function patternMatch(name, o) {
+    if (name === 'blue') return clamp01((o.p15 - 0.08) / 0.17);
+    if (name === 'green') return clamp01((o.p30 - 0.08) / 0.14);
+    if (name === 'yellow') return clamp01((0.9 - o.dip) / 0.5);
+    return clamp01(1 - Math.max(o.p15, o.p30) / 0.12) * clamp01((o.dip - 0.75) / 0.2) * 0.6;
+  }
+
+  function patternScore(img, set) {
+    const m = mappings(set)[0];
+    if (!m) return 0;
+    let s = 0;
+    for (const name of NAMES) s += patternMatch(name, arcPattern(img, m.map, name));
+    return s / 4;
+  }
+
+  // Read the image along where one arc should be (any colour: cameras shift them)
+  // and return the centre of what is there plus how much of the arc is present.
+  function snapArc(img, map, name, tol) {
+    const { data, width: w, height: h } = img;
+    const pad = (8 * Math.PI) / 180;
+    const a0 = (ARC_START[name] * Math.PI) / 180, span = 2 * ARC_HALF;
+    const STEPS = 40, rstep = Math.max(1, tol / 8);
+    const xs = [], ys = [], vs = [], step = [];
+    for (let k = 0; k < STEPS; k++) {
+      const a = a0 - pad + ((k + 0.5) / STEPS) * (span + 2 * pad), ca = Math.cos(a), sa = Math.sin(a);
+      for (let d = -tol; d <= tol + 1e-9; d += rstep) {
+        const p = map(SIZE / 2 + (ANCHOR_RADIUS + d) * ca, SIZE / 2 + (ANCHOR_RADIUS + d) * sa);
+        const x = Math.round(p.x), y = Math.round(p.y);
+        let v = 0;
+        if (x >= 0 && y >= 0 && x < w && y < h) {
+          const i = (y * w + x) * 4, r = data[i], g = data[i + 1], b = data[i + 2];
+          v = Math.max(r, g, b) - Math.min(r, g, b);
+        }
+        xs.push(p.x); ys.push(p.y); vs.push(v); step.push(k);
+      }
+    }
+    // Background colourfulness is what most of the window shows
+    const sorted = Float64Array.from(vs).sort();
+    const base = sorted[Math.floor(sorted.length * 0.5)] + 8;
+    let top = 0;
+    for (const v of vs) if (v - base > top) top = v - base;
+    if (top < 10) return null;
+    const best = new Float64Array(STEPS);
+    let sx = 0, sy = 0, sw = 0;
+    for (let i = 0; i < vs.length; i++) {
+      const wgt = vs[i] - base;
+      if (wgt <= 0) continue;
+      sx += wgt * xs[i]; sy += wgt * ys[i]; sw += wgt;
+      if (wgt > best[step[i]]) best[step[i]] = wgt;
+    }
+    // Coverage over the arc itself (not the padding)
+    let inside = 0, covered = 0;
+    for (let k = 0; k < STEPS; k++) {
+      const a = -pad + ((k + 0.5) / STEPS) * (span + 2 * pad);
+      if (a < 0 || a > span) continue;
+      inside++;
+      if (best[k] > top * 0.3) covered++;
+    }
+    return { x: sx / sw, y: sy / sw, count: Math.round(sw / 10), coverage: covered / inside };
+  }
+
+  // Starting from some trusted anchors, predict every arc, snap each anchor onto what
+  // the image shows there, and repeat with a narrower window. A blob that picked up
+  // something nearby (a ring on the page, a light) gets pulled back onto its arc,
+  // and a missing anchor gets filled in.
+  // Position, size and rotation from just two anchors
+  function pairMap(ns, cur) {
+    const r0 = refAnchor(ns[0]), r1 = refAnchor(ns[1]), p0 = cur[ns[0]], p1 = cur[ns[1]];
+    const wx = r1.x - r0.x, wy = r1.y - r0.y, zx = p1.x - p0.x, zy = p1.y - p0.y;
+    const den = wx * wx + wy * wy;
+    const a = (wx * zx + wy * zy) / den, b = (wx * zy - wy * zx) / den;
+    return (x, y) => ({ x: p0.x + a * (x - r0.x) - b * (y - r0.y), y: p0.y + b * (x - r0.x) + a * (y - r0.y) });
+  }
+
+  function settle(img, base) {
+    let cur = base, cover = {};
+    for (const tol of [30, 16, 10]) {
+      const ns = NAMES.filter((n) => cur[n]);
+      const map = ns.length === 4
+        ? homography(ns.map(refAnchor), ns.map((n) => cur[n]))
+        : ns.length === 3 ? affine(ns.map(refAnchor), ns.map((n) => cur[n]))
+        : ns.length === 2 ? pairMap(ns, cur) : null;
+      if (!map) break;
+      const next = {};
+      cover = {};
+      for (const name of NAMES) {
+        const s = snapArc(img, map, name, tol);
+        if (s && s.coverage >= 0.3) { next[name] = { x: s.x, y: s.y, count: s.count }; cover[name] = s.coverage; }
+        else if (cur[name]) next[name] = cur[name];
+      }
+      cur = next;
+    }
+    let total = 0;
+    for (const name of NAMES) total += cover[name] || 0;
+    return { set: cur, coverage: total / 4 };
+  }
+
+  // Ranked anchor sets: one blob per colour that together form a Qode's shape
+  function anchorSets(img) {
+    const { cands, minDim } = candidates(img);
+    const opts = NAMES.map((n) => [null, ...cands[n]]);
+    const sets = [];
+    for (const r of opts[0]) for (const b of opts[1]) for (const g of opts[2]) for (const y of opts[3]) {
+      const set = {};
+      if (r) set.red = r;
+      if (b) set.blue = b;
+      if (g) set.green = g;
+      if (y) set.yellow = y;
+      const vals = Object.values(set);
+      const k = vals.length;
+      if (k < 3) continue;
+      // The same blob cannot be two anchors (the hue bands overlap)
+      let clash = false;
+      for (let i = 0; i < k && !clash; i++) for (let j = i + 1; j < k; j++) {
+        if (Math.hypot(vals[i].x - vals[j].x, vals[i].y - vals[j].y) < minDim * 0.02) { clash = true; break; }
+      }
+      if (clash) continue;
+      const f = fitError(set);
+      if (f.size < minDim * 0.035 || f.size > minDim * 1.2) continue;
+      // Tilted codes leave some error; anything beyond this is not a Qode
+      if (f.err > (k === 4 ? 0.3 : 0.16)) continue;
+      sets.push({ set, score: f.err + (4 - k) * 0.12 });
+    }
+    sets.sort((p, q) => p.score - q.score);
+    // The hue bands overlap, so a set can be the right blobs under the wrong names
+    // (the code read turned by 90°). Same shape, but the line patterns give it away.
+    for (const s of sets.slice(0, 8)) s.score -= patternScore(img, s.set) * 0.8;
+    sets.sort((p, q) => p.score - q.score);
+    if (sets.length) {
+      // Settle the best few, each also from every three of its anchors
+      // (so one bad blob cannot spoil the rest), and keep what fits the image best
+      const refined = [];
+      const seen = new Map();
+      const key = (b) => NAMES.map((n) => (b[n] ? Math.round(b[n].x) + ',' + Math.round(b[n].y) : '-')).join('|');
+      search: for (const s of sets.slice(0, 6)) {
+        const ns = NAMES.filter((n) => s.set[n]);
+        const bases = [s.set];
+        const pick = (keep) => Object.fromEntries(keep.map((n) => [n, s.set[n]]));
+        if (ns.length === 4) for (const skip of ns) bases.push(pick(ns.filter((n) => n !== skip)));
+        for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++) bases.push(pick([ns[i], ns[j]]));
+        for (const base of bases) {
+          // Different sets often share blobs: settle each starting point once
+          const kb = key(base);
+          if (seen.has(kb)) continue;
+          seen.set(kb, true);
+          const c = settle(img, base);
+          const k = Object.keys(c.set).length;
+          if (k < 3) continue;
+          const pattern = patternScore(img, c.set);
+          refined.push({ set: c.set, score: fitError(c.set).err + (4 - k) * 0.12 + (1 - c.coverage) * 0.6 - pattern * 0.8 });
+          // All four arcs there with their own patterns: no need to look further
+          if (k === 4 && c.coverage >= 0.85 && pattern >= 0.55) break search;
+        }
+      }
+      if (!refined.length) return sets.slice(0, 3).map((s) => s.set);
+      refined.sort((p, q) => p.score - q.score);
+      // Best settled sets first, the blob sets as found after them (settling can
+      // also drift on a very blurry code); decode tries them in this order
+      const out = [];
+      const add = (set) => { if (set && !out.includes(set) && out.length < 4) out.push(set); };
+      add(sets[0].set); add(refined[0] && refined[0].set); add(sets[1] && sets[1].set); add(refined[1] && refined[1].set);
+      // The settled set sits on the arcs themselves: best for drawing the outline
+      out.display = refined[0] ? refined[0].set : sets[0].set;
+      return out;
+    }
+    // No full shape: report the strongest colours (for "fit the whole code" hints)
+    const partial = {};
+    NAMES.map((n) => [n, cands[n][0]]).filter(([, c]) => c)
+      .sort((p, q) => q[1].count - p[1].count).slice(0, 2)
+      .forEach(([n, c]) => { partial[n] = c; });
+    return [partial];
+  }
+
+  function findAnchors(img) {
+    return anchorSets(img)[0];
   }
 
   // --- 2. Reference -> image mappings ---
@@ -480,12 +759,16 @@
 
   // Cheap: is there a code, and where? Fast enough for every camera frame.
   function locate(img) {
-    const anchors = findAnchors(img);
+    const sets = anchorSets(img);
+    const anchors = sets[0];
     const foundCount = Object.keys(anchors).length;
     const maps = foundCount >= 2 ? mappings(anchors) : [];
     if (!maps.length) return { found: false, foundCount, anchors };
-    const g = geometry(maps[0].map);
-    return { found: true, foundCount, anchors, maps, center: g.center, diameter: g.diameter, outline: outlineOf(maps[0].map) };
+    const shown = (sets.display && mappings(sets.display)[0]) || maps[0];
+    const g = geometry(shown.map);
+    // Runner-up anchor sets, tried by decode when the best one does not read
+    const others = sets.slice(1).map((s) => ({ anchors: s, foundCount: Object.keys(s).length, maps: mappings(s) }));
+    return { found: true, foundCount, anchors, maps, others, center: g.center, diameter: g.diameter, outline: outlineOf(shown.map) };
   }
 
   // Read text from dot measurements
@@ -538,14 +821,32 @@
     if (!loc.found) return failure(loc.foundCount < 2 ? 'No Qode anchors found' : 'Need all anchors in view', loc);
     if (loc.diameter < (opts.minDiameter || 120)) return failure('Move closer', loc);
 
-    let best = null, bestMap = null;
-    for (const m of loc.maps) {
-      const r = readFeats(measure(img, m.map), opts, m.kind);
-      if (r && (!best || r.score > best.score)) { best = r; bestMap = m.map; }
-      if (best && best.minMargin >= NEED[best.ecc] * 3) break; // clear enough, skip weaker mappings
+    let best = null, bestMap = null, bestLoc = loc;
+    const cands = [loc, ...(loc.others || [])];
+    const single = (opts.strictness ?? 1) >= 1; // live scanning reads looser and confirms across frames
+    for (let ci = 0; ci < cands.length; ci++) {
+      const cand = cands[ci];
+      // Second-choice anchor sets must read more clearly (fewer chances for a wrong text)
+      const o = ci === 0 ? opts : { ...opts, strictness: (opts.strictness ?? 1) * 2.5 };
+      let pick = null, persp = null;
+      const votes = new Map();
+      for (const m of cand.maps) {
+        const r = readFeats(measure(img, m.map), o, m.kind);
+        if (!r) continue;
+        votes.set(r.text, (votes.get(r.text) || 0) + 1);
+        if (m.kind === 'perspective') persp = { r, map: m.map };
+        if (!pick || r.score > pick.r.score) pick = { r, map: m.map };
+        if (m.kind === 'perspective' && r.minMargin >= NEED[r.ecc] * 3) break; // clear enough, skip weaker mappings
+      }
+      // Mappings that read different texts: trust the full perspective one
+      if (pick && votes.size > 1) pick = persp;
+      // A single image (an upload) has no second frame to confirm it, so a text read
+      // only by a partial mapping of a second-choice set needs another mapping to agree
+      if (single && ci > 0 && pick && pick !== persp && votes.get(pick.r.text) < 2) pick = null;
+      if (pick) { best = pick.r; bestMap = pick.map; bestLoc = cand; break; }
     }
     if (!best) return failure(loc.foundCount < 4 ? 'Need all anchors in view' : 'Could not read the dots yet', loc);
-    return success(best, loc, bestMap);
+    return success(best, { ...loc, anchors: bestLoc.anchors, foundCount: bestLoc.foundCount }, bestMap);
   }
 
   return { decode, locate, findAnchors, _internals: { mappings, measure, classify, dataGrid } };

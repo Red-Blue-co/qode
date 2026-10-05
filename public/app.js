@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let w = null, pending = null, id = 0;
         if (isScannerPage && window.Worker) {
             try {
-                w = new Worker('qode-worker.js');
+                w = new Worker('qode-worker.js?v=3');
                 w.onmessage = (e) => { const cb = pending; pending = null; if (cb) cb(e.data.result); };
                 w.onerror = () => { w = null; const cb = pending; pending = null; if (cb) cb(null); };
             } catch (e) { w = null; }
@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
                     // Very old browsers: decode on the page instead
-                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-decoder.js');
+                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-decoder.js?v=3');
                     ready.then(() => {
                         const D = window.QodeDecoder;
                         const r = type === 'locate' ? plain(D.locate(imageData)) : D.decode(imageData, options);

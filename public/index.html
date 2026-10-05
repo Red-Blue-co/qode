@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QODE | The Geometry of Information</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="background-glow"></div>
+
+    <nav class="glass-nav">
+        <!-- Logo: QODE (Gradient text based on styles) -->
+        <div class="logo-text">QODE</div>
+
+        <!-- Nav: Home (Pill), Generate, Scan -->
+        <div class="nav-links-right">
+            <a href="#" class="nav-pill active">Home</a>
+            <a href="generator.html" class="nav-item">Generate</a>
+            <a href="scanner.html" class="nav-item">Scan</a>
+        </div>
+    </nav>
+
+    <main class="centered-hero">
+        <section class="hero-content-center">
+            <!-- Main Title: QODE -->
+            <h1 class="gradient-headline">QODE</h1>
+
+            <!-- Subtitle -->
+            <p class="subtitle-text">The Geometry of Information</p>
+
+            <!-- Buttons -->
+            <div class="cta-group">
+                <button class="btn-primary large" id="start-btn">Start Creating</button>
+                <button class="btn-secondary large">Learn More</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        document.getElementById('start-btn').addEventListener('click', () => {
+            window.location.href = 'generator.html';
+        });
+    </script>
+</body>
+
+</html>

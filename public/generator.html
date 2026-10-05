@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qode | Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="background-glow"></div>
+
+    <!-- Updated Navbar to match Index.html -->
+    <nav class="glass-nav">
+        <!-- Logo: QODE (Gradient text based on styles) -->
+        <a href="index.html" style="text-decoration: none;">
+            <div class="logo-text">QODE</div>
+        </a>
+
+        <!-- Nav: Home, Generate, Scan -->
+        <div class="nav-links-right">
+            <a href="index.html" class="nav-item">Home</a>
+            <a href="#" class="nav-pill active">Generate</a>
+            <a href="scanner.html" class="nav-item">Scan</a>
+        </div>
+    </nav>
+
+    <main class="generator-layout">
+        <div class="controls-panel glass-card">
+            <h2 class="gradient-headline" style="font-size: 3rem; margin-bottom: 2rem;">Design.</h2>
+
+            <div class="input-group">
+                <label>Content</label>
+                <!-- REQUESTED DEFAULT TEXT -->
+                <input type="text" id="qode-text" class="glass-input" value="hello word this qode"
+                    placeholder="Enter text or URL...">
+            </div>
+
+            <div class="input-group">
+                <label>Complexity</label>
+                <div class="slider-container" style="display: flex; align-items: center; gap: 10px; color: white;">
+                    <span style="font-size: 0.9rem;">Simple</span>
+                    <input type="range" id="qode-ecc" min="1" max="4" value="2" style="flex: 1;">
+                    <span style="font-size: 0.9rem;">Complex</span>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button id="generate-btn" class="btn-primary large">Update View</button>
+            </div>
+        </div>
+
+        <div class="preview-panel">
+            <div class="qode-preview-container">
+                <div class="scan-line"></div>
+                <!-- Initial placeholder image if needed, or JS will load -->
+                <img id="qode-image" src="" alt="Generated Qode" class="qode-img hidden">
+                <div class="loading-spinner"></div>
+            </div>
+
+            <button id="save-btn" class="btn-save">
+                <span class="btn-text">Save Qode</span>
+                <span class="btn-icon"></span>
+            </button>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

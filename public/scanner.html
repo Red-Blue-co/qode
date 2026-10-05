@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qode | Scanner</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="background-glow"></div>
+
+    <!-- Navbar -->
+    <nav class="glass-nav">
+        <a href="index.html" style="text-decoration: none;">
+            <div class="logo-text">QODE</div>
+        </a>
+        <div class="nav-links-right">
+            <a href="index.html" class="nav-item">Home</a>
+            <a href="generator.html" class="nav-item">Generate</a>
+            <a href="#" class="nav-pill active">Scan</a>
+        </div>
+    </nav>
+
+    <main class="scanner-layout">
+        <!-- Scan Controls / Result -->
+        <div class="controls-panel glass-card">
+            <h2 class="gradient-headline" style="font-size: 3rem; margin-bottom: 2rem;">Decode.</h2>
+
+            <!-- Mode Switcher -->
+            <div class="mode-switch">
+                <button id="mode-camera" class="mode-btn active">Camera</button>
+                <button id="mode-upload" class="mode-btn">Upload</button>
+            </div>
+
+            <div class="result-box hidden" id="result-box">
+                <label>Decoded Text:</label>
+                <textarea id="scan-result" class="glass-input" readonly rows="4" placeholder="Scanning..."></textarea>
+                <button id="copy-btn" class="btn-secondary small" style="margin-top: 1rem;">Copy Text</button>
+            </div>
+
+            <div id="scan-status" style="margin-top: 1rem; color: rgba(255,255,255,0.6); min-height: 20px;"></div>
+        </div>
+
+        <!-- Viewfinder Panel -->
+        <div class="preview-panel">
+
+            <!-- Camera View -->
+            <div id="camera-view" class="scanner-container active">
+                <div class="scan-overlay">
+                    <!-- Focus Reticle Arcs -->
+                    <div class="focus-arc tl"></div>
+                    <div class="focus-arc tr"></div>
+                    <div class="focus-arc bl"></div>
+                    <div class="focus-arc br"></div>
+                </div>
+                <video id="video-feed" playsinline muted></video>
+                <!-- Success Capture Preview (Google Lens Style) -->
+                <img id="scan-snap-preview" class="hidden" alt="Captured Qode">
+                <!-- Lock ring shown when code is captured -->
+                <div id="lock-ring" class="lock-ring hidden"></div>
+                <!-- Decoded text overlay (sits on top of frozen snapshot) -->
+                <div id="decoded-overlay" class="decoded-overlay hidden">
+                    <div class="decoded-label">Decoded</div>
+                    <div id="decoded-text" class="decoded-text"></div>
+                </div>
+                <canvas id="capture-canvas" style="display: none;"></canvas>
+            </div>
+
+            <!-- Upload View -->
+            <div id="upload-view" class="scanner-container">
+                <div class="dropzone" id="dropzone">
+                    <span class="icon">📁</span>
+                    <p>Drag & Drop or Click to Upload</p>
+                    <input type="file" id="file-input" accept="image/*" hidden>
+                </div>
+                <img id="uploaded-preview" class="hidden" alt="Preview">
+            </div>
+
+            <!-- Action Button -->
+            <div class="actions center" style="margin-top: 2rem;">
+                <button id="scan-btn" class="btn-save">
+                    <span class="btn-text">Scan Now</span>
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

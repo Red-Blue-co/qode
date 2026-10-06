@@ -2,7 +2,7 @@
   "name": "QODE",
   "short_name": "QODE",
   "description": "Create circular hexagon codes and read them live with your camera.",
-  "start_url": "index.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#030305",
   "theme_color": "#030305",

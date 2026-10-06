@@ -9,8 +9,16 @@ const RobustHexScanner = require('./qrScanner');
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Serve static files from 'public'
-app.use(express.static(path.join(__dirname, 'public')));
+// Clean addresses: /scanner instead of /scanner.html. Old .html links still work.
+app.use((req, res, next) => {
+    if (!req.path.endsWith('.html')) return next();
+    const clean = req.path === '/index.html' ? '/' : req.path.slice(0, -'.html'.length);
+    const query = req.originalUrl.slice(req.path.length);
+    res.redirect(301, clean + query);
+});
+
+// Serve static files from 'public' (/scanner finds scanner.html)
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 app.use(express.json());
 
 // --- API: GENERATE ---

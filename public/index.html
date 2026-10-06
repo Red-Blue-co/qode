@@ -24,40 +24,56 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=13">
+    <link rel="stylesheet" href="style.css?v=14">
 </head>
 
 <body>
     <div class="background-glow"></div>
 
     <header class="topbar">
-        <a class="brand" href="index.html"><span class="brand-mark"></span><span class="grad-text">QODE</span></a>
-        <nav class="tabs" aria-label="Main">
-            <a class="tab active" href="index.html" aria-current="page">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
-                Home
-            </a>
-            <a class="tab" href="generator.html">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-                Create
-            </a>
-            <a class="tab" href="scanner.html">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>
-                Scan
-            </a>
+        <a class="brand" href="/"><span class="brand-mark"></span><span class="grad-text">QODE</span></a>
+        <nav class="sections" aria-label="On this page">
+            <a href="/#story">Story</a>
+            <a href="/#anchors">Anchors</a>
+            <a href="/#how">How it works</a>
+            <a href="/#open">Open source</a>
         </nav>
+        <div class="topbar-end">
+            <nav class="tabs" aria-label="Main">
+                <a class="tab active" href="/" aria-current="page">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+                    Home
+                </a>
+                <a class="tab tab-learn" href="/#story">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16"/></svg>
+                    Learn
+                </a>
+                <a class="tab" href="/generator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                    Create
+                </a>
+                <a class="tab" href="/scanner">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>
+                    Scan
+                </a>
+            </nav>
+            <a class="gh" href="https://github.com/Red-Blue-co/qode" target="_blank" rel="noopener" aria-label="QODE on GitHub">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.29-1.69-1.29-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+            </a>
+        </div>
     </header>
 
-    <main class="page">
+    <main class="page home">
+        <!-- Hero -->
         <section class="hero">
             <div class="hero-copy">
                 <span class="eyebrow">Circular codes · read live</span>
                 <h1 class="hero-title grad-text">QODE</h1>
                 <p class="hero-sub">The Geometry of Information</p>
-                <p class="hero-text">Turn any text or link into a hexagon-dot code, then read it back instantly with your phone camera, right in the browser.</p>
+                <p class="hero-text">Turn any text or link into a round code of hexagon dots, then read it back instantly with your phone camera, right in the browser.</p>
                 <div class="cta-row">
-                    <a class="btn btn-primary btn-lg" href="generator.html">Create a Qode</a>
-                    <a class="btn btn-ghost btn-lg" href="scanner.html">Scan a Qode</a>
+                    <a class="btn btn-primary btn-lg" href="/generator">Create a Qode</a>
+                    <a class="btn btn-ghost btn-lg" href="/scanner">Scan a Qode</a>
                 </div>
             </div>
             <div class="hero-visual">
@@ -70,58 +86,157 @@
             </div>
         </section>
 
-        <section class="section" id="how">
-            <div class="section-head">
-                <h2>How it <span class="grad-text">works</span></h2>
-                <p>Three things make a Qode easy to find and hard to misread.</p>
+        <!-- Numbers -->
+        <section class="stats reveal" aria-label="QODE in numbers">
+            <div class="stat"><b data-count="1012">1,012</b><span>dots in every Qode</span></div>
+            <div class="stat"><b data-count="3">3</b><span>states per dot</span></div>
+            <div class="stat"><b data-count="4">4</b><span>anchors, four patterns</span></div>
+            <div class="stat"><b data-count="0">0</b><span>uploads when you scan</span></div>
+        </section>
+
+        <!-- Story -->
+        <section class="section story" id="story">
+            <div class="story-grid">
+                <div class="reveal">
+                    <span class="eyebrow">The story</span>
+                    <h2 class="h2">Why a code should be <span class="grad-text">round</span></h2>
+                </div>
+                <div class="story-copy reveal">
+                    <p>Square codes were made for factories: fast to print, built from black and white blocks, read by machines on a conveyor belt. They work, but they look like a barcode wearing a disguise.</p>
+                    <p>QODE starts from a different question: <strong>what if a code looked like something you would want on a poster, a card or a screen?</strong> A circle has no top or bottom, sits naturally next to a logo, and turns any phone into the reader.</p>
+                    <p>So the dots became hexagons, packed like a honeycomb. Each dot learned to say three things instead of two. And the corners were replaced by four coloured arcs, a tiny compass that tells the camera exactly where it is looking.</p>
+                </div>
             </div>
-            <div class="features">
-                <article class="feature card">
-                    <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#ff3e3e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="12" r="2.5"/><circle cx="8.5" cy="6" r="2.5"/><circle cx="15.5" cy="18" r="2.5"/></svg>
-                    </div>
-                    <h3>Three-state dots</h3>
-                    <p>Each dot is empty, a ring or filled, so a small circle holds more than a square code of the same size.</p>
-                </article>
-                <article class="feature card">
-                    <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#6b8cff" stroke-width="2" stroke-linecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
-                    </div>
-                    <h3>Reads live</h3>
-                    <p>Point your camera and the scanner follows the code frame by frame, locking in the moment the text is certain.</p>
-                </article>
-                <article class="feature card">
-                    <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-                    </div>
-                    <h3>Stays on your device</h3>
-                    <p>Camera frames and uploaded photos are decoded in your browser. Nothing you scan is sent anywhere.</p>
-                </article>
-            </div>
-            <div class="anchor-legend">
-                <div class="anchor-chip card">
-                    <svg viewBox="0 0 34 16"><path d="M3 13 Q17 1 31 13" stroke="#ef4444" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
-                    <span><b>Solid</b>red anchor</span>
-                </div>
-                <div class="anchor-chip card">
-                    <svg viewBox="0 0 34 16"><path d="M3 13 Q17 1 31 13" stroke="#3b82f6" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="0 6"/></svg>
-                    <span><b>Dotted</b>blue anchor</span>
-                </div>
-                <div class="anchor-chip card">
-                    <svg viewBox="0 0 34 16"><path d="M3 13 Q17 1 31 13" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="5 6"/></svg>
-                    <span><b>Dashed</b>green anchor</span>
-                </div>
-                <div class="anchor-chip card">
-                    <svg viewBox="0 0 34 16"><path d="M3 14 Q17 2 31 14" stroke="#facc15" stroke-width="1.6" fill="none"/><path d="M3 10 Q17 -2 31 10" stroke="#facc15" stroke-width="1.6" fill="none"/></svg>
-                    <span><b>Double</b>yellow anchor</span>
+            <div class="signature card reveal">
+                <div class="sig-swatch"><span style="background:#ff3e3e"></span><span style="background:linear-gradient(90deg,#ff3e3e,#2962ff)"></span><span style="background:#2962ff"></span></div>
+                <div>
+                    <h3>The Red-Blue signature</h3>
+                    <p>Every project from Red-Blue Co carries one gradient: <strong style="color:#ff6b6b">red</strong> for energy, the spark that starts something, flowing into <strong style="color:#6b8cff">blue</strong> for calm and trust, the thing you can rely on. QODE wears it in its name, its buttons and the light around its lens.</p>
                 </div>
             </div>
         </section>
 
-        <footer class="footer">QODE · made by <a href="https://sherin.fun">Sherin Varghese</a></footer>
+        <!-- Anchors -->
+        <section class="section" id="anchors">
+            <div class="section-head reveal">
+                <span class="eyebrow">The compass</span>
+                <h2 class="h2">Four anchors. Four <span class="grad-text">personalities.</span></h2>
+                <p>Each arc has its own colour <em>and</em> its own line pattern. Colour gives a quick first guess; the pattern proves it, even when a camera shifts colours or a red lamp sits in the background.</p>
+            </div>
+            <div class="anchors">
+                <div class="anchor-stage reveal">
+                    <img src="api/generate?text=QODE%20anchors&amp;ecc=2" alt="A Qode with its four anchors" width="500" height="500">
+                    <svg viewBox="0 0 500 500" class="anchor-overlay" aria-hidden="true">
+                        <path data-anchor="red" d="M38.6 173.0 A225 225 0 0 1 173.0 38.6" />
+                        <path data-anchor="blue" d="M327.0 38.6 A225 225 0 0 1 461.4 173.0" />
+                        <path data-anchor="green" d="M461.4 327.0 A225 225 0 0 1 327.0 461.4" />
+                        <path data-anchor="yellow" d="M173.0 461.4 A225 225 0 0 1 38.6 327.0" />
+                    </svg>
+                </div>
+                <div class="anchor-list">
+                    <button class="anchor-card card reveal active" data-anchor="red">
+                        <svg viewBox="0 0 60 20"><path d="M4 16 Q30 -2 56 16" stroke="#ef4444" stroke-width="5" fill="none" stroke-linecap="round"/></svg>
+                        <span><b>Red · Solid</b><small>The spark. One unbroken line, the boldest mark on the code, sits top left where reading starts.</small></span>
+                    </button>
+                    <button class="anchor-card card reveal" data-anchor="blue">
+                        <svg viewBox="0 0 60 20"><path d="M4 16 Q30 -2 56 16" stroke="#3b82f6" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="0 9"/></svg>
+                        <span><b>Blue · Dotted</b><small>The steady one. A row of evenly spaced beads: easy to count, impossible to mistake for a plain line.</small></span>
+                    </button>
+                    <button class="anchor-card card reveal" data-anchor="green">
+                        <svg viewBox="0 0 60 20"><path d="M4 16 Q30 -2 56 16" stroke="#22c55e" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="7 7"/></svg>
+                        <span><b>Green · Dashed</b><small>The go signal. Longer dashes with a rhythm twice as slow as the blue dots.</small></span>
+                    </button>
+                    <button class="anchor-card card reveal" data-anchor="yellow">
+                        <svg viewBox="0 0 60 20"><path d="M4 17 Q30 0 56 17" stroke="#facc15" stroke-width="2" fill="none"/><path d="M4 12 Q30 -5 56 12" stroke="#facc15" stroke-width="2" fill="none"/></svg>
+                        <span><b>Yellow · Double</b><small>The light. Two thin parallel lines with a gap between them, a shape nothing else on a desk has.</small></span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dots -->
+        <section class="section" id="dots">
+            <div class="section-head reveal">
+                <span class="eyebrow">The alphabet</span>
+                <h2 class="h2">Every dot says one of <span class="grad-text">three things</span></h2>
+                <p>A square code's block is on or off. A Qode dot can be empty, a ring or filled, so the same space holds more.</p>
+            </div>
+            <div class="trits">
+                <div class="trit card reveal"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="11" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2"/></svg><b>0 · Empty</b><span>A faint outline</span></div>
+                <div class="trit card reveal"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="11" fill="none" stroke="#fff" stroke-width="4"/></svg><b>1 · Ring</b><span>A hollow circle</span></div>
+                <div class="trit card reveal"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#fff"/></svg><b>2 · Filled</b><span>A solid dot</span></div>
+            </div>
+            <div class="math card reveal">
+                <div><b>5 dots</b><span>per character</span></div>
+                <i>→</i>
+                <div><b>3⁵ = 243</b><span>possible values</span></div>
+                <i>→</i>
+                <div><b>a–z, 0–9, symbols</b><span>and an end marker</span></div>
+            </div>
+            <div class="levels">
+                <div class="level card reveal"><span class="chip">Light</span><b>201</b><small>characters · each digit stored once</small></div>
+                <div class="level card reveal featured"><span class="chip">Balanced</span><b>67</b><small>characters · every digit stored 3×, scuffs are no problem</small></div>
+                <div class="level card reveal"><span class="chip">Strong</span><b>40</b><small>characters · every digit stored 5×, for rough surfaces</small></div>
+            </div>
+        </section>
+
+        <!-- How the scanner reads -->
+        <section class="section" id="how">
+            <div class="section-head reveal">
+                <span class="eyebrow">Under the hood</span>
+                <h2 class="h2">How the scanner <span class="grad-text">reads</span></h2>
+                <p>Five steps, run many times a second on your own device.</p>
+            </div>
+            <ol class="steps">
+                <li class="step card reveal"><span class="num">01</span><div><b>Find</b><p>Colour picks out candidate arcs; the line pattern along each one confirms it. Lit keyboards, bottles and page decorations are rejected.</p></div></li>
+                <li class="step card reveal"><span class="num">02</span><div><b>Straighten</b><p>Four anchors give four fixed points, enough to undo tilt, rotation and perspective, so a code held at an angle reads like one held flat.</p></div></li>
+                <li class="step card reveal"><span class="num">03</span><div><b>Measure</b><p>Each of the 1,012 dots is measured by the total light it gives off, which stays the same when the camera blurs it.</p></div></li>
+                <li class="step card reveal"><span class="num">04</span><div><b>Decide</b><p>The scanner learns what empty, ring and filled look like in <em>this</em> picture, then the stored copies of every digit vote.</p></div></li>
+                <li class="step card reveal"><span class="num">05</span><div><b>Check &amp; lock</b><p>Readable characters, an end marker in the right place and copies that agree. A very clear frame locks at once; otherwise two frames must match.</p></div></li>
+            </ol>
+            <div class="private card reveal">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                <div><b>Nothing leaves your phone.</b> Two background workers share the job: one follows the code on every frame, the other reads full-resolution frames. Camera images and uploaded photos are decoded in the browser and never sent anywhere.</div>
+            </div>
+        </section>
+
+        <!-- Open source -->
+        <section class="section" id="open">
+            <a class="repo card reveal" href="https://github.com/Red-Blue-co/qode" target="_blank" rel="noopener">
+                <div class="repo-top">
+                    <svg class="repo-gh" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.29-1.69-1.29-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+                    <div>
+                        <span class="eyebrow">Open source</span>
+                        <h2 class="h2">Red-Blue-co / <span class="grad-text">qode</span></h2>
+                    </div>
+                    <span class="btn btn-primary">View on GitHub
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+                    </span>
+                </div>
+                <p>The generator, the decoder and this site, all in plain JavaScript. Read how the anchors are found, fork it, or build your own reader.</p>
+                <div class="chips">
+                    <span class="chip">JavaScript</span><span class="chip">Node.js</span><span class="chip">Express</span><span class="chip">node-canvas</span><span class="chip">Web Workers</span><span class="chip">getUserMedia</span>
+                </div>
+            </a>
+        </section>
+
+        <!-- Closing call to action -->
+        <section class="cta-band reveal">
+            <h2>Make your first <span class="grad-text">Qode</span></h2>
+            <p>It takes a few seconds. Then point your phone at it.</p>
+            <div class="cta-row center">
+                <a class="btn btn-primary btn-lg" href="/generator">Create a Qode</a>
+                <a class="btn btn-ghost btn-lg" href="/scanner">Scan a Qode</a>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <span>QODE · a <span class="grad-text">Red-Blue Co</span> project</span>
+            <span><a href="https://github.com/Red-Blue-co/qode" target="_blank" rel="noopener">GitHub</a> · <a href="https://sherin.fun">Made by Sherin Varghese</a></span>
+        </footer>
     </main>
 
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
 </body>
 
 </html>

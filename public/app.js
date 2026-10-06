@@ -39,6 +39,56 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', placeAll);
     if (document.fonts) document.fonts.ready.then(placeAll);
 
+    // --- Home: scroll-in, counting numbers, the anchor explorer ---
+    const reveals = document.querySelectorAll('.reveal');
+    if (reveals.length) {
+        if ('IntersectionObserver' in window && !reduceMotion) {
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach((e) => {
+                    if (!e.isIntersecting) return;
+                    // Siblings come in one after another
+                    const i = [...e.target.parentElement.children].indexOf(e.target);
+                    e.target.style.transitionDelay = `${Math.min(i, 5) * 70}ms`;
+                    e.target.classList.add('in');
+                    e.target.querySelectorAll('[data-count]').forEach(countUp);
+                    io.unobserve(e.target);
+                });
+            }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+            reveals.forEach((el) => io.observe(el));
+        } else {
+            reveals.forEach((el) => el.classList.add('in'));
+        }
+    }
+
+    function countUp(el) {
+        const to = Number(el.dataset.count);
+        if (!to) return;
+        const start = performance.now();
+        (function tick(now) {
+            const k = Math.min(1, (now - start) / 1200);
+            el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))).toLocaleString('en');
+            if (k < 1) requestAnimationFrame(tick);
+        })(start);
+    }
+
+    const anchorCards = [...document.querySelectorAll('.anchor-card')];
+    if (anchorCards.length) {
+        const arcs = document.querySelectorAll('.anchor-overlay path');
+        const show = (name) => {
+            anchorCards.forEach((c) => c.classList.toggle('active', c.dataset.anchor === name));
+            arcs.forEach((a) => a.classList.toggle('on', a.dataset.anchor === name));
+        };
+        // Walk through the four on its own until someone picks one
+        let n = 0;
+        const auto = setInterval(() => { n = (n + 1) % anchorCards.length; show(anchorCards[n].dataset.anchor); }, 3200);
+        const pick = (c) => { clearInterval(auto); show(c.dataset.anchor); };
+        anchorCards.forEach((c) => {
+            c.addEventListener('click', () => pick(c));
+            c.addEventListener('mouseenter', () => pick(c));
+        });
+        show('red');
+    }
+
     // --- Generator ---
     const qodeText = document.getElementById('qode-text');
     const qodeEcc = document.getElementById('qode-ecc');
@@ -55,6 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
         2: ['Balanced', 'Each digit is stored three times, so scuffs and glare are no problem.'],
         3: ['Strong', 'Each digit is stored five times. For rough surfaces and long distances.'],
     };
+    // Characters that fit at each strength (1,012 dots, 5 per character, 1, 3 or 5 copies)
+    const LIMIT = { 1: 201, 2: 67, 3: 40 };
 
     if (qodeText && qodeImage) {
         const updateCount = () => { if (charCount) charCount.textContent = `${qodeText.value.length} / ${qodeText.maxLength}`; };
@@ -74,13 +126,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 placeThumb(strength);
                 qodeEcc.value = b.dataset.ecc;
+                setLimit();
                 const [name, text] = STRENGTH[b.dataset.ecc];
                 document.getElementById('strength-hint').textContent = name;
                 document.getElementById('strength-text').textContent = text;
                 generateQode();
             });
         }
-        updateCount();
+        // Stronger codes hold less text; trim anything that no longer fits
+        function setLimit() {
+            const max = LIMIT[qodeEcc.value] || 67;
+            qodeText.maxLength = max;
+            if (qodeText.value.length > max) qodeText.value = qodeText.value.slice(0, max);
+            updateCount();
+        }
+        setLimit();
         generateQode();
     }
 

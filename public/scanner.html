@@ -3,96 +3,114 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Qode | Scanner</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#030305">
+    <title>QODE | Scan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 
 <body>
-
     <div class="background-glow"></div>
 
-    <!-- Navbar -->
-    <nav class="glass-nav">
-        <a href="index.html" style="text-decoration: none;">
-            <div class="logo-text">QODE</div>
-        </a>
-        <div class="nav-links-right">
-            <a href="index.html" class="nav-item">Home</a>
-            <a href="generator.html" class="nav-item">Generate</a>
-            <a href="#" class="nav-pill active">Scan</a>
-        </div>
-    </nav>
+    <header class="topbar">
+        <a class="brand" href="index.html"><span class="brand-mark"></span><span class="grad-text">QODE</span></a>
+        <nav class="tabs" aria-label="Main">
+            <a class="tab" href="index.html">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+                Home
+            </a>
+            <a class="tab" href="generator.html">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                Create
+            </a>
+            <a class="tab active" href="scanner.html" aria-current="page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>
+                Scan
+            </a>
+        </nav>
+    </header>
 
-    <main class="scanner-layout">
-        <!-- Scan Controls / Result -->
-        <div class="controls-panel glass-card">
-            <h2 class="gradient-headline" style="font-size: 3rem; margin-bottom: 2rem;">Decode.</h2>
-
-            <!-- Mode Switcher -->
-            <div class="mode-switch">
-                <button id="mode-camera" class="mode-btn active">Camera</button>
-                <button id="mode-upload" class="mode-btn">Upload</button>
-            </div>
-
-            <div class="result-box hidden" id="result-box">
-                <label>Decoded Text:</label>
-                <textarea id="scan-result" class="glass-input" readonly rows="4" placeholder="Scanning..."></textarea>
-                <button id="copy-btn" class="btn-secondary small" style="margin-top: 1rem;">Copy Text</button>
-            </div>
-
-            <div id="scan-status" style="margin-top: 1rem; color: rgba(255,255,255,0.6); min-height: 20px;"></div>
-        </div>
-
-        <!-- Viewfinder Panel -->
-        <div class="preview-panel">
-
-            <!-- Camera View -->
-            <div id="camera-view" class="scanner-container active">
-                <div class="scan-overlay">
-                    <!-- Focus Reticle Arcs -->
-                    <div class="focus-arc tl"></div>
-                    <div class="focus-arc tr"></div>
-                    <div class="focus-arc bl"></div>
-                    <div class="focus-arc br"></div>
+    <main class="page">
+        <div class="scan-layout">
+            <section class="scan-side">
+                <div class="scan-head">
+                    <h1 class="title">Decode<span class="dot">.</span></h1>
+                    <p class="lede">Point your camera at a Qode. It reads live, right on your device.</p>
                 </div>
-                <video id="video-feed" playsinline muted></video>
-                <!-- Live tracking outline drawn over the camera image -->
-                <canvas id="track-overlay" class="track-overlay" aria-hidden="true"></canvas>
-                <!-- Success Capture Preview (Google Lens Style) -->
-                <img id="scan-snap-preview" class="hidden" alt="Captured Qode">
-                <!-- Lock ring shown when code is captured -->
-                <div id="lock-ring" class="lock-ring hidden"></div>
-                <!-- Decoded text overlay (sits on top of frozen snapshot) -->
-                <div id="decoded-overlay" class="decoded-overlay hidden">
-                    <div class="decoded-label">Decoded</div>
-                    <div id="decoded-text" class="decoded-text"></div>
+
+                <div class="segmented" role="tablist" aria-label="Scan from">
+                    <span class="thumb"></span>
+                    <button id="mode-camera" class="mode-btn active" role="tab">Camera</button>
+                    <button id="mode-upload" class="mode-btn" role="tab">Upload</button>
                 </div>
-                <canvas id="capture-canvas" style="display: none;"></canvas>
-            </div>
 
-            <!-- Upload View -->
-            <div id="upload-view" class="scanner-container">
-                <div class="dropzone" id="dropzone">
-                    <span class="icon">📁</span>
-                    <p>Drag & Drop or Click to Upload</p>
-                    <input type="file" id="file-input" accept="image/*" hidden>
+                <div id="result-box" class="result card hidden" aria-live="polite">
+                    <div class="result-head">
+                        <span class="result-label">Decoded</span>
+                        <span id="result-kind" class="chip">Text</span>
+                    </div>
+                    <div id="scan-result" class="result-text"></div>
+                    <div class="result-actions">
+                        <a id="open-btn" class="btn btn-primary hidden" target="_blank" rel="noopener noreferrer">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                            Open link
+                        </a>
+                        <button id="copy-btn" class="btn btn-ghost">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>
+                            <span>Copy</span>
+                        </button>
+                        <button id="scan-btn" class="btn btn-ghost">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/></svg>
+                            <span>Scan again</span>
+                        </button>
+                    </div>
                 </div>
-                <img id="uploaded-preview" class="hidden" alt="Preview">
-            </div>
+            </section>
 
-            <!-- Action Button -->
-            <div class="actions center" style="margin-top: 2rem;">
-                <button id="scan-btn" class="btn-save">
-                    <span class="btn-text">Scanning live…</span>
-                </button>
-            </div>
+            <section class="scan-stage">
+                <div class="lens" id="lens">
+                    <div class="lens-halo"></div>
+                    <div class="lens-ring"></div>
+                    <div class="lens-draw"></div>
 
+                    <div id="camera-view" class="scanner-container active">
+                        <video id="video-feed" playsinline muted></video>
+                        <svg class="reticle" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="34" pathLength="360" /></svg>
+                        <!-- Outline that follows the code -->
+                        <canvas id="track-overlay" class="track-overlay" aria-hidden="true"></canvas>
+                        <img id="scan-snap-preview" class="hidden" alt="The frame the Qode was read from">
+                        <div class="burst"></div>
+                        <div class="glint"></div>
+                        <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+                        <canvas id="capture-canvas" hidden></canvas>
+                    </div>
+
+                    <div id="upload-view" class="scanner-container">
+                        <label class="dropzone" id="dropzone">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg>
+                            <strong>Choose a photo</strong>
+                            <span>or drop a screenshot of a Qode here</span>
+                            <input type="file" id="file-input" accept="image/*" hidden>
+                        </label>
+                        <img id="uploaded-preview" class="hidden" alt="Your photo">
+                        <div class="burst"></div>
+                        <div class="glint"></div>
+                        <button id="change-photo" class="btn btn-ghost change-photo hidden">Choose another</button>
+                    </div>
+                </div>
+
+                <div class="status" id="status" data-state="idle">
+                    <span class="status-dot"></span>
+                    <span id="scan-status">Starting camera…</span>
+                </div>
+            </section>
         </div>
     </main>
 
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=9"></script>
 </body>
 
 </html>

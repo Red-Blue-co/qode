@@ -3,72 +3,82 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Qode | Generator</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#030305">
+    <title>QODE | Create</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 
 <body>
-
     <div class="background-glow"></div>
 
-    <!-- Updated Navbar to match Index.html -->
-    <nav class="glass-nav">
-        <!-- Logo: QODE (Gradient text based on styles) -->
-        <a href="index.html" style="text-decoration: none;">
-            <div class="logo-text">QODE</div>
-        </a>
+    <header class="topbar">
+        <a class="brand" href="index.html"><span class="brand-mark"></span><span class="grad-text">QODE</span></a>
+        <nav class="tabs" aria-label="Main">
+            <a class="tab" href="index.html">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+                Home
+            </a>
+            <a class="tab active" href="generator.html" aria-current="page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                Create
+            </a>
+            <a class="tab" href="scanner.html">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>
+                Scan
+            </a>
+        </nav>
+    </header>
 
-        <!-- Nav: Home, Generate, Scan -->
-        <div class="nav-links-right">
-            <a href="index.html" class="nav-item">Home</a>
-            <a href="#" class="nav-pill active">Generate</a>
-            <a href="scanner.html" class="nav-item">Scan</a>
-        </div>
-    </nav>
-
-    <main class="generator-layout">
-        <div class="controls-panel glass-card">
-            <h2 class="gradient-headline" style="font-size: 3rem; margin-bottom: 2rem;">Design.</h2>
-
-            <div class="input-group">
-                <label>Content</label>
-                <!-- REQUESTED DEFAULT TEXT -->
-                <input type="text" id="qode-text" class="glass-input" value="hello word this qode"
-                    placeholder="Enter text or URL...">
-            </div>
-
-            <div class="input-group">
-                <label>Complexity</label>
-                <div class="slider-container" style="display: flex; align-items: center; gap: 10px; color: white;">
-                    <span style="font-size: 0.9rem;">Simple</span>
-                    <input type="range" id="qode-ecc" min="1" max="4" value="2" style="flex: 1;">
-                    <span style="font-size: 0.9rem;">Complex</span>
+    <main class="page">
+        <div class="gen-layout">
+            <section class="gen-controls">
+                <div>
+                    <h1 class="title">Design<span class="dot">.</span></h1>
+                    <p class="lede">Type text or a link. Your Qode updates as you type.</p>
                 </div>
-            </div>
 
-            <div class="actions">
-                <button id="generate-btn" class="btn-primary large">Update View</button>
-            </div>
-        </div>
+                <div class="field">
+                    <label for="qode-text">Content <small id="char-count"></small></label>
+                    <textarea id="qode-text" class="input" rows="2" maxlength="120" placeholder="Text or a link…">https://qode.sherin.fun</textarea>
+                </div>
 
-        <div class="preview-panel">
-            <div class="qode-preview-container">
-                <div class="scan-line"></div>
-                <!-- Initial placeholder image if needed, or JS will load -->
-                <img id="qode-image" src="" alt="Generated Qode" class="qode-img hidden">
-                <div class="loading-spinner"></div>
-            </div>
+                <div class="field">
+                    <label>Strength <small id="strength-hint">Balanced</small></label>
+                    <div class="segmented" id="strength" role="radiogroup" aria-label="Strength">
+                        <span class="thumb"></span>
+                        <button type="button" data-ecc="1" role="radio">Light</button>
+                        <button type="button" data-ecc="2" role="radio" class="active">Balanced</button>
+                        <button type="button" data-ecc="3" role="radio">Strong</button>
+                    </div>
+                    <input type="hidden" id="qode-ecc" value="2">
+                    <p class="hint" id="strength-text">Each digit is stored three times, so scuffs and glare are no problem.</p>
+                </div>
 
-            <button id="save-btn" class="btn-save">
-                <span class="btn-text">Save Qode</span>
-                <span class="btn-icon"></span>
-            </button>
+                <div class="gen-actions">
+                    <button id="save-btn" class="btn btn-primary btn-lg">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+                        <span>Save image</span>
+                    </button>
+                    <a class="btn btn-ghost btn-lg" href="scanner.html">Scan it</a>
+                </div>
+            </section>
+
+            <section class="gen-preview">
+                <div class="stage" id="stage">
+                    <div class="orbit-glow"></div>
+                    <div class="orbit-ring"></div>
+                    <img id="qode-image" class="qode-img hidden" alt="Your Qode" width="500" height="500">
+                    <div class="spinner"></div>
+                </div>
+            </section>
         </div>
     </main>
 
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=9"></script>
 </body>
 
 </html>

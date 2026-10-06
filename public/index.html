@@ -3,52 +3,111 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#030305">
+    <meta name="description" content="QODE turns text into a circular hexagon code, and reads it live with your phone camera.">
     <title>QODE | The Geometry of Information</title>
-    <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 
 <body>
-
     <div class="background-glow"></div>
 
-    <nav class="glass-nav">
-        <!-- Logo: QODE (Gradient text based on styles) -->
-        <div class="logo-text">QODE</div>
+    <header class="topbar">
+        <a class="brand" href="index.html"><span class="brand-mark"></span><span class="grad-text">QODE</span></a>
+        <nav class="tabs" aria-label="Main">
+            <a class="tab active" href="index.html" aria-current="page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+                Home
+            </a>
+            <a class="tab" href="generator.html">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                Create
+            </a>
+            <a class="tab" href="scanner.html">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>
+                Scan
+            </a>
+        </nav>
+    </header>
 
-        <!-- Nav: Home (Pill), Generate, Scan -->
-        <div class="nav-links-right">
-            <a href="#" class="nav-pill active">Home</a>
-            <a href="generator.html" class="nav-item">Generate</a>
-            <a href="scanner.html" class="nav-item">Scan</a>
-        </div>
-    </nav>
-
-    <main class="centered-hero">
-        <section class="hero-content-center">
-            <!-- Main Title: QODE -->
-            <h1 class="gradient-headline">QODE</h1>
-
-            <!-- Subtitle -->
-            <p class="subtitle-text">The Geometry of Information</p>
-
-            <!-- Buttons -->
-            <div class="cta-group">
-                <button class="btn-primary large" id="start-btn">Start Creating</button>
-                <button class="btn-secondary large">Learn More</button>
+    <main class="page">
+        <section class="hero">
+            <div class="hero-copy">
+                <span class="eyebrow">Circular codes · read live</span>
+                <h1 class="hero-title grad-text">QODE</h1>
+                <p class="hero-sub">The Geometry of Information</p>
+                <p class="hero-text">Turn any text or link into a hexagon-dot code, then read it back instantly with your phone camera, right in the browser.</p>
+                <div class="cta-row">
+                    <a class="btn btn-primary btn-lg" href="generator.html">Create a Qode</a>
+                    <a class="btn btn-ghost btn-lg" href="scanner.html">Scan a Qode</a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="orbit">
+                    <div class="orbit-glow"></div>
+                    <div class="orbit-ring"></div>
+                    <div class="orbit-ring r2"></div>
+                    <img src="api/generate?text=Welcome%20to%20QODE&amp;ecc=2" alt="A Qode that reads “Welcome to QODE”" width="500" height="500">
+                </div>
             </div>
         </section>
+
+        <section class="section" id="how">
+            <div class="section-head">
+                <h2>How it <span class="grad-text">works</span></h2>
+                <p>Three things make a Qode easy to find and hard to misread.</p>
+            </div>
+            <div class="features">
+                <article class="feature card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#ff3e3e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="12" r="2.5"/><circle cx="8.5" cy="6" r="2.5"/><circle cx="15.5" cy="18" r="2.5"/></svg>
+                    </div>
+                    <h3>Three-state dots</h3>
+                    <p>Each dot is empty, a ring or filled, so a small circle holds more than a square code of the same size.</p>
+                </article>
+                <article class="feature card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#6b8cff" stroke-width="2" stroke-linecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
+                    </div>
+                    <h3>Reads live</h3>
+                    <p>Point your camera and the scanner follows the code frame by frame, locking in the moment the text is certain.</p>
+                </article>
+                <article class="feature card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                    </div>
+                    <h3>Stays on your device</h3>
+                    <p>Camera frames and uploaded photos are decoded in your browser. Nothing you scan is sent anywhere.</p>
+                </article>
+            </div>
+            <div class="anchor-legend">
+                <div class="anchor-chip card">
+                    <svg viewBox="0 0 34 16"><path d="M3 13 Q17 1 31 13" stroke="#ef4444" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+                    <span><b>Solid</b>red anchor</span>
+                </div>
+                <div class="anchor-chip card">
+                    <svg viewBox="0 0 34 16"><path d="M3 13 Q17 1 31 13" stroke="#3b82f6" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="0 6"/></svg>
+                    <span><b>Dotted</b>blue anchor</span>
+                </div>
+                <div class="anchor-chip card">
+                    <svg viewBox="0 0 34 16"><path d="M3 13 Q17 1 31 13" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="5 6"/></svg>
+                    <span><b>Dashed</b>green anchor</span>
+                </div>
+                <div class="anchor-chip card">
+                    <svg viewBox="0 0 34 16"><path d="M3 14 Q17 2 31 14" stroke="#facc15" stroke-width="1.6" fill="none"/><path d="M3 10 Q17 -2 31 10" stroke="#facc15" stroke-width="1.6" fill="none"/></svg>
+                    <span><b>Double</b>yellow anchor</span>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">QODE · made by <a href="https://sherin.fun">Sherin Varghese</a></footer>
     </main>
 
-    <script src="app.js?v=6"></script>
-    <script>
-        document.getElementById('start-btn').addEventListener('click', () => {
-            window.location.href = 'generator.html';
-        });
-    </script>
+    <script src="app.js?v=9"></script>
 </body>
 
 </html>

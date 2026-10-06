@@ -397,7 +397,7 @@
           const k = Object.keys(c.set).length;
           if (k < 3) continue;
           const pattern = patternScore(img, c.set);
-          refined.push({ set: c.set, score: fitError(c.set).err + (4 - k) * 0.12 + (1 - c.coverage) * 0.6 - pattern * 0.8 });
+          refined.push({ set: c.set, coverage: c.coverage, pattern, err: fitError(c.set).err, score: fitError(c.set).err + (4 - k) * 0.12 + (1 - c.coverage) * 0.6 - pattern * 0.8 });
           // All four arcs there with their own patterns: no need to look further
           if (k === 4 && c.coverage >= 0.85 && pattern >= 0.55) break search;
         }
@@ -411,6 +411,7 @@
       add(sets[0].set); add(refined[0] && refined[0].set); add(sets[1] && sets[1].set); add(refined[1] && refined[1].set);
       // The settled set sits on the arcs themselves: best for drawing the outline
       out.display = refined[0] ? refined[0].set : sets[0].set;
+      out.quality = refined[0] ? { coverage: refined[0].coverage, pattern: refined[0].pattern, err: refined[0].err } : null;
       return out;
     }
     // No full shape: report the strongest colours (for "fit the whole code" hints)
@@ -764,11 +765,14 @@
     const foundCount = Object.keys(anchors).length;
     const maps = foundCount >= 2 ? mappings(anchors) : [];
     if (!maps.length) return { found: false, foundCount, anchors };
+    // Coloured things in a room (a lit keyboard, a bottle, a pen) can fall into a
+    // Qode-like shape; a real code's arcs are actually there along their whole length
+    if (sets.quality && sets.quality.coverage < 0.6) return { found: false, foundCount: 0, anchors: {} };
     const shown = (sets.display && mappings(sets.display)[0]) || maps[0];
     const g = geometry(shown.map);
     // Runner-up anchor sets, tried by decode when the best one does not read
     const others = sets.slice(1).map((s) => ({ anchors: s, foundCount: Object.keys(s).length, maps: mappings(s) }));
-    return { found: true, foundCount, anchors, maps, others, center: g.center, diameter: g.diameter, outline: outlineOf(shown.map) };
+    return { found: true, foundCount, anchors, maps, others, quality: sets.quality, center: g.center, diameter: g.diameter, outline: outlineOf(shown.map) };
   }
 
   // Read text from dot measurements

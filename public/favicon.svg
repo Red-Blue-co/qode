@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .line { stroke: #5f6368; }
+    @media (prefers-color-scheme: dark) { .line { stroke: #e8eaed; } }
+  </style>
+  <g fill="none" stroke-width="4.4" stroke-linecap="round">
+    <!-- Globe outline in the four Qode anchor colours -->
+    <path d="M12.91 12.91 A27 27 0 0 1 51.09 12.91" stroke="#2f6bff"/>
+    <path d="M51.09 12.91 A27 27 0 0 1 51.09 51.09" stroke="#22c55e"/>
+    <path d="M51.09 51.09 A27 27 0 0 1 12.91 51.09" stroke="#facc15"/>
+    <path d="M12.91 51.09 A27 27 0 0 1 12.91 12.91" stroke="#ff3e3e"/>
+    <!-- Meridian and the two latitude lines -->
+    <g class="line" stroke-width="3.8">
+      <ellipse cx="32" cy="32" rx="11" ry="27"/>
+      <path d="M7.4 22.5 H56.6 M7.4 41.5 H56.6"/>
+    </g>
+  </g>
+</svg>

@@ -3,5 +3,19 @@
     "canvas": "^3.2.1",
     "express": "^5.2.1",
     "multer": "^2.0.2"
+  },
+  "description": "QODE: a round hexagon code you create and scan in the browser",
+  "author": {
+    "name": "Sherin Varghese",
+    "email": "admin@sherin.fun",
+    "url": "https://sherin.fun"
+  },
+  "homepage": "https://qode.sherin.fun",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Red-Blue-co/qode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Red-Blue-co/qode/issues"
   }
 }

@@ -1,0 +1,7 @@
+# QODE
+
+> QODE turns text or a link into a circular hexagon code with three dot states, and reads it live with your phone camera, right in the browser. Made by Sherin Varghese (https://sherin.fun).
+
+- [Create a Qode](https://qode.sherin.fun/generator): type text or a link and save or share the code.
+- [Scan a Qode](https://qode.sherin.fun/scanner): point your phone camera at a code, or upload an image.
+- [Source code](https://github.com/Red-Blue-co/qode)

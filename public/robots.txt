@@ -1,0 +1,6 @@
+# qode.sherin.fun by Sherin Varghese (https://sherin.fun)
+
+User-agent: *
+Allow: /
+
+Sitemap: https://qode.sherin.fun/sitemap.xml

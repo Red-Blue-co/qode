@@ -34,7 +34,7 @@
           "operatingSystem": "Any (web browser)",
           "browserRequirements": "Requires JavaScript and, for scanning, a camera",
           "isAccessibleForFree": true,
-          "description": "QODE turns text or a link into a circular hexagon code with three dot states, and reads it live with your phone camera in the browser. No app needed.",
+          "description": "QODE turns text or a link into a circular hexagon code with built-in error correction, and reads it live with your phone camera in the browser. No app needed.",
           "featureList": [
             "Create a round hexagon code from text or a link",
             "Save or share the code as an image",
@@ -119,7 +119,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=17">
 </head>
 
 <body>
@@ -184,9 +184,9 @@
         <!-- Numbers -->
         <section class="stats reveal" aria-label="QODE in numbers">
             <div class="stat"><b data-count="1012">1,012</b><span>dots in every Qode</span></div>
-            <div class="stat"><b data-count="3">3</b><span>states per dot</span></div>
             <div class="stat"><b data-count="4">4</b><span>anchors, four patterns</span></div>
-            <div class="stat"><b data-count="201">201</b><span>characters in one Qode</span></div>
+            <div class="stat"><b data-count="101">101</b><span>characters in one Qode</span></div>
+            <div class="stat"><b data-count="64">64</b><span>bytes of error correction</span></div>
         </section>
 
         <!-- Story -->
@@ -199,7 +199,7 @@
                 <div class="story-copy reveal">
                     <p>Square codes were made for factories: fast to print, built from black and white blocks, read by machines on a conveyor belt. They work, but they look like a barcode wearing a disguise.</p>
                     <p>QODE starts from a different question: <strong>what if a code looked like something you would want on a poster, a card or a screen?</strong> A circle has no top or bottom, sits naturally next to a logo, and turns any phone into the reader.</p>
-                    <p>So the dots became hexagons, packed like a honeycomb. Each dot learned to say three things instead of two. And the corners were replaced by four coloured arcs, a tiny compass that tells the camera exactly where it is looking.</p>
+                    <p>So the dots became hexagons, packed like a honeycomb. Every dot is simply on or off, and the message is wrapped in error correction, so a smudge or a reflection does not stop it. And the corners were replaced by four coloured arcs, a tiny compass that tells the camera exactly where it is looking.</p>
                 </div>
             </div>
             <div class="signature card reveal">
@@ -253,25 +253,25 @@
         <section class="section" id="dots">
             <div class="section-head reveal">
                 <span class="eyebrow">The alphabet</span>
-                <h2 class="h2">Every dot says one of <span class="grad-text">three things</span></h2>
-                <p>A square code's block is on or off. A Qode dot can be empty, a ring or filled, so the same space holds more.</p>
+                <h2 class="h2">Simple dots, <span class="grad-text">clever protection</span></h2>
+                <p>Every dot is one bit: empty or filled. Two states a camera tells apart instantly, even through blur and glare. The intelligence is in how the bits are protected.</p>
             </div>
             <div class="trits">
                 <div class="trit card reveal"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="11" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2"/></svg><b>0 · Empty</b><span>A faint outline</span></div>
-                <div class="trit card reveal"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="11" fill="none" stroke="#fff" stroke-width="4"/></svg><b>1 · Ring</b><span>A hollow circle</span></div>
-                <div class="trit card reveal"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#fff"/></svg><b>2 · Filled</b><span>A solid dot</span></div>
+                <div class="trit card reveal"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="#fff"/></svg><b>1 · Filled</b><span>A solid dot</span></div>
+                <div class="trit card reveal"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2" stroke-dasharray="4 4"/><circle cx="14" cy="16" r="4" fill="#fff"/><circle cx="26" cy="16" r="4" fill="#fff"/><circle cx="20" cy="26" r="4" fill="#ff6b6b"/></svg><b>Self-repairing</b><span>Hidden dots are rebuilt</span></div>
             </div>
             <div class="math card reveal">
-                <div><b>5 dots</b><span>per character</span></div>
+                <div><b>8 dots</b><span>side by side make one byte</span></div>
                 <i>→</i>
-                <div><b>3⁵ = 243</b><span>possible values</span></div>
+                <div><b>126 bytes</b><span>text plus error correction</span></div>
                 <i>→</i>
-                <div><b>a–z, 0–9, symbols</b><span>and an end marker</span></div>
+                <div><b>Any text</b><span>links, accents, symbols, emoji</span></div>
             </div>
             <div class="levels">
-                <div class="level card reveal"><span class="chip">Light</span><b>201</b><small>characters · each digit stored once</small></div>
-                <div class="level card reveal featured"><span class="chip">Balanced</span><b>67</b><small>characters · every digit stored 3×, scuffs are no problem</small></div>
-                <div class="level card reveal"><span class="chip">Strong</span><b>40</b><small>characters · every digit stored 5×, for rough surfaces</small></div>
+                <div class="level card reveal"><span class="chip">Light</span><b>101</b><small>characters · 24 bytes of error correction, for clean screens and prints</small></div>
+                <div class="level card reveal featured"><span class="chip">Balanced</span><b>81</b><small>characters · 44 bytes of error correction, glare and scuffs are no problem</small></div>
+                <div class="level card reveal"><span class="chip">Strong</span><b>61</b><small>characters · 64 bytes of error correction, rebuilds up to half the code</small></div>
             </div>
         </section>
 
@@ -280,18 +280,18 @@
             <div class="section-head reveal">
                 <span class="eyebrow">Under the hood</span>
                 <h2 class="h2">How the scanner <span class="grad-text">reads</span></h2>
-                <p>Five steps, run many times a second on your own device.</p>
+                <p>Five steps, done in a blink on your own device.</p>
             </div>
             <ol class="steps">
                 <li class="step card reveal"><span class="num">01</span><div><b>Find</b><p>Colour picks out candidate arcs; the line pattern along each one confirms it. Lit keyboards, bottles and page decorations are rejected.</p></div></li>
                 <li class="step card reveal"><span class="num">02</span><div><b>Straighten</b><p>Four anchors give four fixed points, enough to undo tilt, rotation and perspective, so a code held at an angle reads like one held flat.</p></div></li>
                 <li class="step card reveal"><span class="num">03</span><div><b>Measure</b><p>Each of the 1,012 dots is measured by the total light it gives off, which stays the same when the camera blurs it.</p></div></li>
-                <li class="step card reveal"><span class="num">04</span><div><b>Decide</b><p>The scanner learns what empty, ring and filled look like in <em>this</em> picture, then the stored copies of every digit vote.</p></div></li>
-                <li class="step card reveal"><span class="num">05</span><div><b>Check &amp; lock</b><p>Readable characters, an end marker in the right place and copies that agree. A very clear frame locks at once; otherwise two frames must match.</p></div></li>
+                <li class="step card reveal"><span class="num">04</span><div><b>Decide</b><p>The scanner learns what empty and filled look like in <em>this</em> picture. Dots under a reflection are marked as unknown instead of guessed.</p></div></li>
+                <li class="step card reveal"><span class="num">05</span><div><b>Repair &amp; lock</b><p>Reed–Solomon error correction, the same kind QR codes use, rebuilds unknown and misread bytes. The moment the code is in view, a quick burst of photos is combined, so you can move away straight after.</p></div></li>
             </ol>
             <div class="private card reveal">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-                <div><b>Nothing leaves your phone.</b> Two background workers share the job: one follows the code on every frame, the other reads full-resolution frames. Camera images and uploaded photos are decoded in the browser and never sent anywhere.</div>
+                <div><b>Nothing leaves your phone.</b> Background workers share the job: one follows the code on every frame, the others read full-resolution photos. Camera images and uploaded photos are decoded in the browser and never sent anywhere.</div>
             </div>
         </section>
 
@@ -331,7 +331,7 @@
         </footer>
     </main>
 
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=17"></script>
 </body>
 
 </html>

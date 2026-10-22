@@ -31,7 +31,7 @@
           "operatingSystem": "Any (web browser)",
           "browserRequirements": "Requires JavaScript and, for scanning, a camera",
           "isAccessibleForFree": true,
-          "description": "QODE turns text or a link into a circular hexagon code with three dot states, and reads it live with your phone camera in the browser. No app needed.",
+          "description": "QODE turns text or a link into a circular hexagon code with built-in error correction, and reads it live with your phone camera in the browser. No app needed.",
           "featureList": [
             "Create a round hexagon code from text or a link",
             "Save or share the code as an image",
@@ -123,7 +123,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=17">
 </head>
 
 <body>
@@ -215,6 +215,10 @@
                         <div class="glint"></div>
                         <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
                         <canvas id="capture-canvas" hidden></canvas>
+                        <span class="focus-ring" id="focus-ring" aria-hidden="true"></span>
+                        <button type="button" id="torch-btn" class="torch-btn hidden" aria-label="Turn the flashlight on" aria-pressed="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l-1 5H9z"/><path d="M9 7l1 3v10a2 2 0 0 0 4 0V10l1-3"/><path d="M12 13v2"/></svg>
+                        </button>
                     </div>
 
                     <div id="upload-view" class="scanner-container">
@@ -235,6 +239,15 @@
                     <span class="status-dot"></span>
                     <span id="scan-status">Starting camera…</span>
                 </div>
+
+                <div class="history card hidden" id="history">
+                    <div class="history-head">
+                        <span class="result-label">Recent scans</span>
+                        <button type="button" class="history-clear" id="history-clear">Clear</button>
+                    </div>
+                    <ul class="history-list" id="history-list"></ul>
+                    <p class="history-note">Saved only on this device.</p>
+                </div>
             </section>
         </div>
         <footer class="footer">
@@ -243,7 +256,7 @@
         </footer>
     </main>
 
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=17"></script>
 </body>
 
 </html>

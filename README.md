@@ -1,6 +1,6 @@
 # QODE
 
-**The Geometry of Information.** QODE turns text or a link into a circular hexagon code with three dot states, and reads it live with your phone camera, right in the browser. No app needed.
+**The Geometry of Information.** QODE turns text or a link into a circular hexagon code with built-in error correction, and reads it live with your phone camera, right in the browser. No app needed.
 
 - Live: [qode.sherin.fun](https://qode.sherin.fun)
 - Create a Qode: [qode.sherin.fun/generator](https://qode.sherin.fun/generator)

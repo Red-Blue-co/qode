@@ -109,9 +109,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const LIMIT = { 1: 101, 2: 81, 3: 61 }; // UTF-8 bytes (see qode-format.js)
 
     if (qodeText && qodeImage) {
-        const updateCount = () => { if (charCount) charCount.textContent = `${qodeText.value.length} / ${qodeText.maxLength}`; };
+        // The limit is in bytes: plain letters take 1, accents 2, symbols and emoji 3-4.
+        // Text that does not fit is trimmed at a whole character, never halfway through one.
+        const enc = new TextEncoder();
+        const bytes = (t) => enc.encode(t).length;
+        const fit = (t, max) => { if (bytes(t) <= max) return t; let out = ''; for (const ch of t) { if (bytes(out + ch) > max) break; out += ch; } return out; };
+        const updateCount = () => { if (charCount) charCount.textContent = `${bytes(qodeText.value)} / ${LIMIT[qodeEcc.value] || 81}`; };
         let timer = null;
         qodeText.addEventListener('input', () => {
+            const max = LIMIT[qodeEcc.value] || 81;
+            if (bytes(qodeText.value) > max) qodeText.value = fit(qodeText.value, max);
             updateCount();
             clearTimeout(timer);
             timer = setTimeout(generateQode, 350);
@@ -136,8 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Stronger codes hold less text; trim anything that no longer fits
         function setLimit() {
             const max = LIMIT[qodeEcc.value] || 81;
-            qodeText.maxLength = max;
-            if (qodeText.value.length > max) qodeText.value = qodeText.value.slice(0, max);
+            qodeText.maxLength = max; // never more characters than bytes
+            if (bytes(qodeText.value) > max) qodeText.value = fit(qodeText.value, max);
             updateCount();
         }
         setLimit();
@@ -245,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let w = null, pending = null, id = 0;
         if (window.Worker) {
             try {
-                w = new Worker('qode-worker.js?v=9');
+                w = new Worker('qode-worker.js?v=10');
                 w.onmessage = (e) => { const cb = pending; pending = null; if (cb) cb(e.data.result); };
                 w.onerror = () => { w = null; const cb = pending; pending = null; if (cb) cb(null); };
             } catch (e) { w = null; }
@@ -260,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         w.postMessage({ id: ++id, type: 'decodeMany', frames: frames.map((f) => ({ width: f.width, height: f.height, buffer: f.data.buffer })), options }, frames.map((f) => f.data.buffer));
                         return;
                     }
-                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-rs.js?v=9').then(() => loadScript('qode-format.js?v=9')).then(() => loadScript('qode-decoder.js?v=9'));
+                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-rs.js?v=10').then(() => loadScript('qode-format.js?v=10')).then(() => loadScript('qode-decoder.js?v=10'));
                     ready.then(() => { const cb = pending; pending = null; cb(window.QodeDecoder.decodeMany(frames, options)); });
                 });
             },
@@ -272,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
                     // Very old browsers: decode on the page instead
-                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-rs.js?v=9').then(() => loadScript('qode-format.js?v=9')).then(() => loadScript('qode-decoder.js?v=9'));
+                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-rs.js?v=10').then(() => loadScript('qode-format.js?v=10')).then(() => loadScript('qode-decoder.js?v=10'));
                     ready.then(() => {
                         const D = window.QodeDecoder;
                         const r = type === 'locate' ? plain(D.locate(imageData)) : D.decode(imageData, options);
@@ -285,6 +292,97 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadScript(src) {
         return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
     }
+    // --- Flashlight and tap to focus (only where the phone allows them) ---
+    const torchBtn = document.getElementById('torch-btn');
+    const focusRing = document.getElementById('focus-ring');
+    let camTrack = null, camCaps = {}, torchOn = false;
+    function setTorch(on) {
+        torchOn = on;
+        if (torchBtn) {
+            torchBtn.classList.toggle('on', on);
+            torchBtn.setAttribute('aria-pressed', String(on));
+            torchBtn.setAttribute('aria-label', on ? 'Turn the flashlight off' : 'Turn the flashlight on');
+        }
+        if (camTrack && camCaps.torch) camTrack.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
+    }
+    function setupTorch() {
+        if (!torchBtn) return;
+        torchBtn.classList.toggle('hidden', !camCaps.torch);
+        torchOn = false;
+        torchBtn.classList.remove('on');
+    }
+    if (torchBtn) torchBtn.addEventListener('click', (e) => { e.stopPropagation(); setTorch(!torchOn); });
+
+    // Tap the view: show a ring there and focus on that spot, then go back to autofocus
+    let refocusTimer = 0;
+    cameraView.addEventListener('click', (e) => {
+        if (isLocked || !camTrack || e.target.closest('button')) return;
+        const box = cameraView.getBoundingClientRect();
+        const x = e.clientX - box.left, y = e.clientY - box.top;
+        if (focusRing) {
+            focusRing.style.left = `${x}px`; focusRing.style.top = `${y}px`;
+            focusRing.classList.remove('show'); void focusRing.offsetWidth; focusRing.classList.add('show');
+        }
+        const modes = camCaps.focusMode || [];
+        const want = {};
+        if (camCaps.pointsOfInterest || 'pointsOfInterest' in (camTrack.getSettings ? camTrack.getSettings() : {})) want.pointsOfInterest = [{ x: x / box.width, y: y / box.height }];
+        if (modes.includes('single-shot')) want.focusMode = 'single-shot';
+        else if (modes.includes('continuous')) want.focusMode = 'continuous'; // restart autofocus
+        if (Object.keys(want).length) camTrack.applyConstraints({ advanced: [want] }).catch(() => {});
+        clearTimeout(refocusTimer);
+        if (modes.includes('continuous')) refocusTimer = setTimeout(() => camTrack && camTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}), 2500);
+    });
+
+    // --- Recent scans: the last few results, kept only in this browser ---
+    const HISTORY_KEY = 'qode-history', HISTORY_MAX = 10;
+    const historyBox = document.getElementById('history');
+    const historyList = document.getElementById('history-list');
+    const readHistory = () => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) { return []; } };
+    const writeHistory = (h) => { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch (e) {} };
+    const ago = (t) => {
+        const s = Math.round((Date.now() - t) / 1000);
+        if (s < 60) return 'just now';
+        if (s < 3600) return `${Math.round(s / 60)} min ago`;
+        if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+        return new Date(t).toLocaleDateString();
+    };
+    function renderHistory() {
+        if (!historyBox || !historyList) return;
+        const h = readHistory();
+        historyBox.classList.toggle('hidden', !h.length);
+        historyList.innerHTML = '';
+        for (const item of h) {
+            const li = document.createElement('li');
+            const kind = kindOf(item.text);
+            const t = document.createElement(kind.href ? 'a' : 'span');
+            t.className = 'history-text';
+            t.textContent = item.text;
+            if (kind.href) { t.href = kind.href; t.target = '_blank'; t.rel = 'noopener'; }
+            const when = document.createElement('span');
+            when.className = 'history-time';
+            when.textContent = ago(item.at);
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'history-copy';
+            copy.textContent = 'Copy';
+            copy.addEventListener('click', async () => {
+                try { await navigator.clipboard.writeText(item.text); copy.textContent = 'Copied'; } catch (e) { copy.textContent = 'Failed'; }
+                setTimeout(() => { copy.textContent = 'Copy'; }, 1400);
+            });
+            li.append(t, when, copy);
+            historyList.appendChild(li);
+        }
+    }
+    function remember(text) {
+        const h = readHistory().filter((x) => x.text !== text); // newest first, no duplicates
+        h.unshift({ text, at: Date.now() });
+        writeHistory(h.slice(0, HISTORY_MAX));
+        renderHistory();
+    }
+    const clearBtn = document.getElementById('history-clear');
+    if (clearBtn) clearBtn.addEventListener('click', () => { writeHistory([]); renderHistory(); });
+    renderHistory();
+
     const tracker = makeEngine();
     const reader = makeEngine();
     const burster = makeEngine(); // reads a captured burst while live reading carries on
@@ -363,6 +461,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // locked focus at a distance stays blurry and nothing reads
             const [videoTrack] = activeStream.getVideoTracks();
             const caps = videoTrack && videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+            camTrack = videoTrack; camCaps = caps;
+            setupTorch();
             const wanted = {};
             if (caps.focusMode && caps.focusMode.includes('continuous')) wanted.focusMode = 'continuous';
             if (caps.exposureMode && caps.exposureMode.includes('continuous')) wanted.exposureMode = 'continuous';
@@ -382,6 +482,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function stopCamera() {
         liveRunning = false;
+        setTorch(false);
+        camTrack = null; camCaps = {};
+        if (torchBtn) torchBtn.classList.add('hidden');
         if (activeStream) {
             activeStream.getTracks().forEach((t) => t.stop());
             videoFeed.srcObject = null;
@@ -523,56 +626,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const easeOut = (x) => 1 - Math.pow(1 - x, 3);
 
-    // The Qode's dot positions (layout units, centre 250,250), lit in a scattered order
-    const DOTS = (() => {
-        const out = [], step = 12, rowH = step * 0.866;
-        for (let y = 0, row = 0; y < 500; y += rowH, row++) {
-            for (let x = -step; x < 500 + step; x += step) {
-                const ax = x + (row % 2 ? step / 2 : 0);
-                const dx = ax - 250, dy = y - 250, r = Math.hypot(dx, dy);
-                if (r < 200) out.push({ r, deg: (Math.atan2(dy, dx) * 180) / Math.PI, order: Math.random() });
-            }
-        }
-        return out;
-    })();
-    let burstAt = 0; // when the code was read: colourful dots burst out of it
-
-    // While the code is in view its dots light up one by one; once read, a burst pops out
-    function drawDots(ctx, now, lost) {
-        if (!shown) return;
-        let cx = 0, cy = 0;
-        for (const p of shown) { cx += p.x; cy += p.y; }
-        cx /= shown.length; cy /= shown.length;
-        const where = (d) => { const e = onOutline(shown, d.deg), k = d.r / 225; return { x: cx + (e.x - cx) * k, y: cy + (e.y - cy) * k }; };
-        const span = Math.hypot(shown[0].x - cx, shown[0].y - cy) / 225;
-        const read = tracking.state === 'read';
-        const lit = Math.min(1, (now - morphStart) / 650);
-        const dotR = Math.max(1.2, 4.2 * span);
-        for (const d of DOTS) {
-            let a;
-            if (read) a = Math.max(0, 1 - (now - burstAt) / 450);
-            else a = Math.max(0, Math.min(1, (lit - d.order) * 6)) * (0.55 + 0.25 * Math.sin(now / 220 + d.order * 12));
-            if (lost) a *= 0.35;
-            if (a <= 0.02) continue;
-            const p = where(d);
-            ctx.fillStyle = read ? `rgba(255, 255, 255, ${a})` : `rgba(160, 140, 255, ${a})`;
-            ctx.beginPath(); ctx.arc(p.x, p.y, dotR, 0, Math.PI * 2); ctx.fill();
-        }
-        if (read && burstAt) {
-            const t = (now - burstAt) / 800;
-            if (t < 1) {
-                const COLS = ['255, 62, 62', '59, 130, 246', '34, 197, 94', '250, 204, 21'];
-                const reach = Math.hypot(shown[0].x - cx, shown[0].y - cy) * (0.4 + 1.1 * easeOut(t));
-                for (let i = 0; i < 36; i++) {
-                    const ang = (i / 36) * Math.PI * 2 + (i % 2) * 0.11;
-                    const rr = reach * (0.85 + (i % 3) * 0.12);
-                    ctx.fillStyle = `rgba(${COLS[i % 4]}, ${1 - t})`;
-                    ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, (10 - 7 * t) * Math.max(0.8, span * 1.6), 0, Math.PI * 2); ctx.fill();
-                }
-            }
-        }
-    }
-
     // The four lens arcs fly onto the code's own anchors and follow them
     function drawOverlay() {
         const o = overlayContext();
@@ -594,7 +647,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const alpha = (lost ? 0.35 : 1) * pulse;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        drawDots(ctx, now, lost);
 
         // Once read, a gradient ring closes around the code
         if (state === 'read') {
@@ -636,7 +688,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function lockScan(payload) {
         if (isLocked) return;
         isLocked = true;
-        burstAt = performance.now();
         // Freeze the frame the text was read from (the burst's first photo if it read)
         if (!snapPreview.src || !snapPreview.src.startsWith('data:')) snapPreview.src = captureCanvas.toDataURL('image/jpeg', 0.85);
         snapPreview.classList.remove('hidden');
@@ -689,6 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showResult(text) {
         lastText = text;
+        remember(text);
         const kind = kindOf(text);
         resultKind.textContent = kind.label;
         if (kind.href) {
@@ -703,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultBox.style.animation = 'none';
         void resultBox.offsetWidth;
         resultBox.style.animation = '';
-        scanResult.textContent = text; // pops in with the card (no scramble)
+        decrypt(scanResult, text);
     }
 
     // Text "decrypts" from random glyphs into the real characters, left to right

@@ -47,8 +47,13 @@
   // text -> one bit per dot (1 = filled)
   function encode(text, level = 2) {
     const nsym = LEVELS[level], k = BYTES - nsym;
+    // Too long: drop whole characters from the end until it fits (never half a character)
     let data = utf8(text);
-    if (data.length > k - 1) data = data.slice(0, k - 1);
+    if (data.length > k - 1) {
+      let t = '';
+      for (const ch of text) { if (utf8(t + ch).length > k - 1) break; t += ch; }
+      data = utf8(t);
+    }
     const msg = [data.length, ...data];
     while (msg.length < k) msg.push(0);
     const cw = RS.encode(msg, nsym).map((b, i) => b ^ mask(i));

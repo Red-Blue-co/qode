@@ -1053,7 +1053,7 @@ button {
     gap: 16px;
     position: relative;
     overflow: hidden;
-    animation: rise 0.55s var(--spring);
+    animation: popIn 0.6s var(--spring);
 }
 
 .result::before {
@@ -1064,6 +1064,14 @@ button {
     top: 0;
     height: 3px;
     background: var(--grad);
+}
+
+/* The result pops in, a beat after the burst */
+@keyframes popIn {
+    0% { opacity: 0; transform: scale(0.6); }
+    35% { opacity: 0; transform: scale(0.6); }
+    75% { opacity: 1; transform: scale(1.04); }
+    100% { opacity: 1; transform: scale(1); }
 }
 
 @keyframes rise {

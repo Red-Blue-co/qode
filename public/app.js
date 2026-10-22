@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let k = 0; k < BURST && !isLocked; k++) {
             const f = cropFrame(box);
             if (f) frames.push(f);
-            if (k === 0) { snapPreview.src = burstCanvas.toDataURL('image/jpeg', 0.85); setStatus('Got it! Reading…', 'reading'); }
+            if (k === 0) { snapPreview.src = burstCanvas.toDataURL('image/jpeg', 0.85); setStatus('Scanning…', 'reading'); }
             await new Promise((r) => setTimeout(r, BURST_GAP));
         }
         if (isLocked || !frames.length) { capturing = false; return; }
@@ -359,6 +359,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
                 audio: false,
             });
+            // Keep refocusing on its own (phones that support it): close up, a camera that
+            // locked focus at a distance stays blurry and nothing reads
+            const [videoTrack] = activeStream.getVideoTracks();
+            const caps = videoTrack && videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+            const wanted = {};
+            if (caps.focusMode && caps.focusMode.includes('continuous')) wanted.focusMode = 'continuous';
+            if (caps.exposureMode && caps.exposureMode.includes('continuous')) wanted.exposureMode = 'continuous';
+            if (Object.keys(wanted).length) videoTrack.applyConstraints({ advanced: [wanted] }).catch(() => {});
             videoFeed.srcObject = activeStream;
             await videoFeed.play().catch(() => {});
             cameraView.classList.add('live');
@@ -446,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (loc.foundCount < 3) setStatus('Fit the whole Qode in view.');
             else if (!readable) setStatus('Move a little closer.');
             else {
-                if (!capturing) setStatus('Reading…', 'reading');
+                if (!capturing) setStatus('Scanning…', 'reading');
                 if (performance.now() - burstFailedAt > 700) captureBurst();
             }
         });
@@ -515,6 +523,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const easeOut = (x) => 1 - Math.pow(1 - x, 3);
 
+    // The Qode's dot positions (layout units, centre 250,250), lit in a scattered order
+    const DOTS = (() => {
+        const out = [], step = 12, rowH = step * 0.866;
+        for (let y = 0, row = 0; y < 500; y += rowH, row++) {
+            for (let x = -step; x < 500 + step; x += step) {
+                const ax = x + (row % 2 ? step / 2 : 0);
+                const dx = ax - 250, dy = y - 250, r = Math.hypot(dx, dy);
+                if (r < 200) out.push({ r, deg: (Math.atan2(dy, dx) * 180) / Math.PI, order: Math.random() });
+            }
+        }
+        return out;
+    })();
+    let burstAt = 0; // when the code was read: colourful dots burst out of it
+
+    // While the code is in view its dots light up one by one; once read, a burst pops out
+    function drawDots(ctx, now, lost) {
+        if (!shown) return;
+        let cx = 0, cy = 0;
+        for (const p of shown) { cx += p.x; cy += p.y; }
+        cx /= shown.length; cy /= shown.length;
+        const where = (d) => { const e = onOutline(shown, d.deg), k = d.r / 225; return { x: cx + (e.x - cx) * k, y: cy + (e.y - cy) * k }; };
+        const span = Math.hypot(shown[0].x - cx, shown[0].y - cy) / 225;
+        const read = tracking.state === 'read';
+        const lit = Math.min(1, (now - morphStart) / 650);
+        const dotR = Math.max(1.2, 4.2 * span);
+        for (const d of DOTS) {
+            let a;
+            if (read) a = Math.max(0, 1 - (now - burstAt) / 450);
+            else a = Math.max(0, Math.min(1, (lit - d.order) * 6)) * (0.55 + 0.25 * Math.sin(now / 220 + d.order * 12));
+            if (lost) a *= 0.35;
+            if (a <= 0.02) continue;
+            const p = where(d);
+            ctx.fillStyle = read ? `rgba(255, 255, 255, ${a})` : `rgba(160, 140, 255, ${a})`;
+            ctx.beginPath(); ctx.arc(p.x, p.y, dotR, 0, Math.PI * 2); ctx.fill();
+        }
+        if (read && burstAt) {
+            const t = (now - burstAt) / 800;
+            if (t < 1) {
+                const COLS = ['255, 62, 62', '59, 130, 246', '34, 197, 94', '250, 204, 21'];
+                const reach = Math.hypot(shown[0].x - cx, shown[0].y - cy) * (0.4 + 1.1 * easeOut(t));
+                for (let i = 0; i < 36; i++) {
+                    const ang = (i / 36) * Math.PI * 2 + (i % 2) * 0.11;
+                    const rr = reach * (0.85 + (i % 3) * 0.12);
+                    ctx.fillStyle = `rgba(${COLS[i % 4]}, ${1 - t})`;
+                    ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, (10 - 7 * t) * Math.max(0.8, span * 1.6), 0, Math.PI * 2); ctx.fill();
+                }
+            }
+        }
+    }
+
     // The four lens arcs fly onto the code's own anchors and follow them
     function drawOverlay() {
         const o = overlayContext();
@@ -536,6 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const alpha = (lost ? 0.35 : 1) * pulse;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        drawDots(ctx, now, lost);
 
         // Once read, a gradient ring closes around the code
         if (state === 'read') {
@@ -577,6 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function lockScan(payload) {
         if (isLocked) return;
         isLocked = true;
+        burstAt = performance.now();
         // Freeze the frame the text was read from (the burst's first photo if it read)
         if (!snapPreview.src || !snapPreview.src.startsWith('data:')) snapPreview.src = captureCanvas.toDataURL('image/jpeg', 0.85);
         snapPreview.classList.remove('hidden');
@@ -643,7 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultBox.style.animation = 'none';
         void resultBox.offsetWidth;
         resultBox.style.animation = '';
-        decrypt(scanResult, text);
+        scanResult.textContent = text; // pops in with the card (no scramble)
     }
 
     // Text "decrypts" from random glyphs into the real characters, left to right

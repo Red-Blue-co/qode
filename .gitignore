@@ -1,3 +1,8 @@
 node_modules/
 .env
 *.log
+
+# scanner bench output
+bench/*.mjpeg
+bench/*.png
+bench/*.log

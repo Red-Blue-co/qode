@@ -102,11 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const STRENGTH = {
         1: ['Light', 'Fits the most text. Best for clean screens and prints.'],
-        2: ['Balanced', 'Each digit is stored three times, so scuffs and glare are no problem.'],
-        3: ['Strong', 'Each digit is stored five times. For rough surfaces and long distances.'],
+        2: ['Balanced', 'Error correction rebuilds parts hidden by glare or scuffs.'],
+        3: ['Strong', 'The most error correction. For rough surfaces, glare and long distances.'],
     };
     // Characters that fit at each strength (1,012 dots, 5 per character, 1, 3 or 5 copies)
-    const LIMIT = { 1: 201, 2: 67, 3: 40 };
+    const LIMIT = { 1: 101, 2: 81, 3: 61 }; // UTF-8 bytes (see qode-format.js)
 
     if (qodeText && qodeImage) {
         const updateCount = () => { if (charCount) charCount.textContent = `${qodeText.value.length} / ${qodeText.maxLength}`; };
@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Stronger codes hold less text; trim anything that no longer fits
         function setLimit() {
-            const max = LIMIT[qodeEcc.value] || 67;
+            const max = LIMIT[qodeEcc.value] || 81;
             qodeText.maxLength = max;
             if (qodeText.value.length > max) qodeText.value = qodeText.value.slice(0, max);
             updateCount();
@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let w = null, pending = null, id = 0;
         if (window.Worker) {
             try {
-                w = new Worker('qode-worker.js?v=7');
+                w = new Worker('qode-worker.js?v=9');
                 w.onmessage = (e) => { const cb = pending; pending = null; if (cb) cb(e.data.result); };
                 w.onerror = () => { w = null; const cb = pending; pending = null; if (cb) cb(null); };
             } catch (e) { w = null; }
@@ -253,6 +253,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const plain = (l) => ({ found: l.found, foundCount: l.foundCount, outline: l.outline, center: l.center, diameter: l.diameter });
         return {
             get busy() { return !!pending; },
+            runMany(frames, options) {
+                return new Promise((resolve) => {
+                    pending = resolve;
+                    if (w) {
+                        w.postMessage({ id: ++id, type: 'decodeMany', frames: frames.map((f) => ({ width: f.width, height: f.height, buffer: f.data.buffer })), options }, frames.map((f) => f.data.buffer));
+                        return;
+                    }
+                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-rs.js?v=9').then(() => loadScript('qode-format.js?v=9')).then(() => loadScript('qode-decoder.js?v=9'));
+                    ready.then(() => { const cb = pending; pending = null; cb(window.QodeDecoder.decodeMany(frames, options)); });
+                });
+            },
             run(type, imageData, options) {
                 return new Promise((resolve) => {
                     pending = resolve;
@@ -261,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
                     // Very old browsers: decode on the page instead
-                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-decoder.js?v=7');
+                    const ready = window.QodeDecoder ? Promise.resolve() : loadScript('qode-rs.js?v=9').then(() => loadScript('qode-format.js?v=9')).then(() => loadScript('qode-decoder.js?v=9'));
                     ready.then(() => {
                         const D = window.QodeDecoder;
                         const r = type === 'locate' ? plain(D.locate(imageData)) : D.decode(imageData, options);
@@ -276,6 +287,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const tracker = makeEngine();
     const reader = makeEngine();
+    const burster = makeEngine(); // reads a captured burst while live reading carries on
+
+    // Capture: as soon as the code is in view, take a quick burst of photos around it and
+    // read those. The camera can move away right after; a reflection that hides part of
+    // the code in one photo sits somewhere else in the next, and the photos are combined.
+    const BURST = 5, BURST_GAP = 90; // photos, ms between them
+    let capturing = false, burstFailedAt = 0;
+    const burstCanvas = document.createElement('canvas');
+    function cropFrame(box) {
+        const vw = videoFeed.videoWidth, vh = videoFeed.videoHeight;
+        if (!vw || !vh) return null;
+        const x = Math.max(0, box.x), y = Math.max(0, box.y);
+        const w = Math.min(vw - x, box.w), h = Math.min(vh - y, box.h);
+        const k = Math.min(1, 1400 / Math.max(w, h));
+        burstCanvas.width = Math.round(w * k); burstCanvas.height = Math.round(h * k);
+        const ctx = burstCanvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(videoFeed, x, y, w, h, 0, 0, burstCanvas.width, burstCanvas.height);
+        return ctx.getImageData(0, 0, burstCanvas.width, burstCanvas.height);
+    }
+    async function captureBurst() {
+        if (capturing || isLocked || !tracking || !tracking.outline) return;
+        capturing = true;
+        // The area around the code (with room for the hand to move), in video pixels
+        const sx = videoFeed.videoWidth / tracking.fw, sy = videoFeed.videoHeight / tracking.fh;
+        const xs = tracking.outline.map((p) => p.x * sx), ys = tracking.outline.map((p) => p.y * sy);
+        const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+        const half = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 0.85;
+        const box = { x: Math.round(cx - half), y: Math.round(cy - half), w: Math.round(half * 2), h: Math.round(half * 2) };
+        const frames = [];
+        for (let k = 0; k < BURST && !isLocked; k++) {
+            const f = cropFrame(box);
+            if (f) frames.push(f);
+            if (k === 0) { snapPreview.src = burstCanvas.toDataURL('image/jpeg', 0.85); setStatus('Got it! Reading…', 'reading'); }
+            await new Promise((r) => setTimeout(r, BURST_GAP));
+        }
+        if (isLocked || !frames.length) { capturing = false; return; }
+        const r = await burster.runMany(frames, { strictness: 1, minDiameter: 90 });
+        capturing = false;
+        if (isLocked) return;
+        if (r && r.success) { lockScan(r.payload); return; }
+        burstFailedAt = performance.now(); // keep scanning live; try another burst shortly
+    }
 
     // --- Camera / upload switch ---
     modeCameraBtn.addEventListener('click', () => switchMode('camera'));
@@ -392,7 +445,10 @@ document.addEventListener('DOMContentLoaded', () => {
             cameraView.classList.add('tracking');
             if (loc.foundCount < 3) setStatus('Fit the whole Qode in view.');
             else if (!readable) setStatus('Move a little closer.');
-            else setStatus('Reading…', 'reading');
+            else {
+                if (!capturing) setStatus('Reading…', 'reading');
+                if (performance.now() - burstFailedAt > 700) captureBurst();
+            }
         });
     }
 
@@ -521,8 +577,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function lockScan(payload) {
         if (isLocked) return;
         isLocked = true;
-        // Freeze the frame the text was read from
-        snapPreview.src = captureCanvas.toDataURL('image/jpeg', 0.85);
+        // Freeze the frame the text was read from (the burst's first photo if it read)
+        if (!snapPreview.src || !snapPreview.src.startsWith('data:')) snapPreview.src = captureCanvas.toDataURL('image/jpeg', 0.85);
         snapPreview.classList.remove('hidden');
         celebrate(cameraView);
         try { videoFeed.pause(); } catch (e) {}
@@ -543,6 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function clearLock() {
         isLocked = false;
+        burstFailedAt = 0;
         forgetCode();
         snapPreview.classList.add('hidden');
         snapPreview.src = '';

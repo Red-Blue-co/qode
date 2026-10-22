@@ -1,6 +1,7 @@
 "use strict";
 
 const { createCanvas } = require("canvas");
+const QodeFormat = require("./public/qode-format");
 
 class HexGenerator {
     /**
@@ -30,82 +31,13 @@ class HexGenerator {
         ];
     }
 
-    // --- NEW: ESTIMATE CAPACITY (BASE-3) ---
+    // Characters (UTF-8 bytes) that fit at this strength
     estimateCapacity() {
-        const gridLength = this.getGrid().length;
-        const reservedTrits = 5; // Null terminator (approx 1 char)
-        const usableDots = gridLength - reservedTrits;
-
-        // Calculate based on ECC Redundancy
-        let divider = 1;
-        if (this.eccLevel === 2) divider = 3;
-        if (this.eccLevel === 3) divider = 5;
-
-        const maxTrits = Math.floor(usableDots / divider);
-        
-        // We need 5 Trits to represent 1 ASCII character (3^5 = 243)
-        const maxChars = Math.floor(maxTrits / 5);
-
-        return maxChars;
-    }
-
-    // --- NEW: TEXT TO TRITS (BASE-3) ---
-    textToTrits(text) {
-        // Convert chars to Base-3 strings (padded to 5 digits)
-        const rawTrits = text.split('')
-            .map(c => {
-                let val = c.charCodeAt(0);
-                // Clamp to safe ASCII range if needed, though 242 covers most
-                return val.toString(3).padStart(5, '0');
-            })
-            .join('');
-
-        // Apply ECC Redundancy (Repeating the trits)
-        let eccTrits = "";
-        const repeats = (this.eccLevel === 1) ? 1 : (this.eccLevel === 3 ? 5 : 3);
-
-        for (let t of rawTrits) {
-            eccTrits += t.repeat(repeats);
-        }
-        return eccTrits;
-    }
-
-    getPointHash(x, y) {
-        let h = Math.imul(x, 374761393);
-        h = Math.imul(h ^ y, 668265263);
-        h = Math.imul(h ^ (h >>> 15), 2246822519);
-        h = h ^ (h >>> 13);
-        return h >>> 0; 
+        return QodeFormat.capacity(this.eccLevel);
     }
 
     getGrid() {
-        const grid = [];
-        const cx = this.size / 2;
-        const cy = this.size / 2;
-        const radius = this.size * 0.40;
-        
-        // HEX PACKING CONSTANTS
-        const rowHeight = this.step * 0.866; 
-        let rowCount = 0;
-
-        for (let y = 0; y < this.size; y += rowHeight) {
-            const xOffset = (rowCount % 2 === 0) ? 0 : (this.step / 2);
-            for (let x = -this.step; x < this.size + this.step; x += this.step) {
-                const actualX = x + xOffset;
-                const dist = Math.sqrt((actualX - cx) ** 2 + (y - cy) ** 2);
-                
-                if (dist < radius) {
-                    grid.push({ x: actualX, y: y });
-                }
-            }
-            rowCount++;
-        }
-
-        grid.sort((a, b) => {
-            return this.getPointHash(a.x, a.y) - this.getPointHash(b.x, b.y);
-        });
-
-        return grid;
+        return QodeFormat.grid();
     }
 
     drawAnchors(ctx) {
@@ -215,23 +147,14 @@ class HexGenerator {
 
             this.drawAnchors(ctx);
 
-            // Generate Trits (Base 3) + Null Terminator
-            const trits = this.textToTrits(text) + "00000"; 
+            // One bit per dot: the text with Reed-Solomon error correction (see public/qode-format.js)
+            const bits = QodeFormat.encode(text, this.eccLevel);
             const grid = this.getGrid();
-
-            const maxChars = this.estimateCapacity();
-            console.log(`[HexGen] Level: ${this.eccLevel} | Usage: ${text.length} / ${maxChars} chars | Mode: Ternary`);
-
-            if (trits.length > grid.length) {
-                console.warn("⚠️ Data too long! It will be truncated.");
+            if (Buffer.byteLength(text, "utf8") > this.estimateCapacity()) {
+                console.warn("Text too long for this strength, it will be cut short.");
             }
-
             for (let i = 0; i < grid.length; i++) {
-                const p = grid[i];
-                // Default to '0' if no data left
-                const val = (i < trits.length) ? trits[i] : '0';
-                
-                this.drawDot(ctx, p.x, p.y, val);
+                this.drawDot(ctx, grid[i].x, grid[i].y, bits[i] ? '2' : '0');
             }
 
             return canvas.toBuffer("image/png");

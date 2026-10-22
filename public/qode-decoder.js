@@ -11,9 +11,9 @@
  * returning wrong text.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.QodeDecoder = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./qode-format'));
+  else root.QodeDecoder = factory(root.QodeFormat);
+})(typeof self !== 'undefined' ? self : this, function (Format) {
   'use strict';
 
   // --- Layout shared with the generator (qrCode.js) ---
@@ -35,27 +35,8 @@
     return h >>> 0;
   }
 
-  // Dot positions in the generator's (hash-shuffled) data order
-  let gridCache = null;
-  function dataGrid() {
-    if (gridCache) return gridCache;
-    const grid = [];
-    const c = SIZE / 2;
-    const radius = SIZE * 0.40;
-    const rowHeight = STEP * 0.866;
-    let row = 0;
-    for (let y = 0; y < SIZE; y += rowHeight) {
-      const off = row % 2 === 0 ? 0 : STEP / 2;
-      for (let x = -STEP; x < SIZE + STEP; x += STEP) {
-        const ax = x + off;
-        if (Math.hypot(ax - c, y - c) < radius) grid.push({ x: ax, y });
-      }
-      row++;
-    }
-    grid.sort((a, b) => pointHash(a.x, a.y) - pointHash(b.x, b.y));
-    gridCache = grid;
-    return grid;
-  }
+  // Dot positions in byte order (shared with the generator)
+  const dataGrid = () => Format.grid();
 
   function refAnchor(name) {
     const a = (ANCHOR_ANGLE[name] * Math.PI) / 180;
@@ -78,7 +59,10 @@
     if (max < floor) return -1;
     const min = r < g ? (r < b ? r : b) : (g < b ? g : b);
     const delta = max - min;
-    if (delta < 22 || delta < max * 0.34) return -1;
+    if (delta < 22) return -1;
+    // A reflection adds white on top of a colour: the colour difference survives but
+    // the colour looks pale. Accept pale colours when they are clearly lifted by light.
+    if (delta < max * 0.34 && !(delta >= 34 && min >= 95)) return -1;
     let h;
     if (max === r) h = (g - b) / delta;
     else if (max === g) h = (b - r) / delta + 2;
@@ -579,163 +563,113 @@
       c /= NEAR.length + 2;
       let r = 0, g = 0, e = 0, ew = 0;
       for (const o of RING) r += at(p, o);
-      for (const o of GAP) g += at(p, o);
+      // The gap around a dot is dark on a real code; a blown-out gap means a reflection
+      let peak = 0;
+      for (const o of GAP) { const v = at(p, o); g += v; if (v > peak) peak = v; }
       for (const o of DISC) { e += o[2] * at(p, o); ew += o[2]; }
-      feats[i] = { c, r: r / RING.length, e: e / ew, bg: g / GAP.length };
+      feats[i] = { c, r: r / RING.length, e: e / ew, bg: g / GAP.length, peak };
     }
     return feats;
+  }
+
+  // Dots within a few steps of each dot (layout space), for a local background
+  let nearCache = null;
+  function neighbours() {
+    if (nearCache) return nearCache;
+    const grid = dataGrid(), R = STEP * 2.6;
+    nearCache = grid.map((p) => {
+      const out = [];
+      grid.forEach((q, j) => { if (Math.abs(q.x - p.x) <= R && Math.abs(q.y - p.y) <= R && Math.hypot(q.x - p.x, q.y - p.y) <= R) out.push(j); });
+      return out;
+    });
+    return nearCache;
   }
 
   // Learn empty / ring / filled from this image itself. Main measure: a dot's total
   // light (blur cannot change it: empty ~0, ring ~half, filled = full). Second
   // measure: brightness right at the centre (rings are dark there when sharp).
   function classify(feats) {
+    const n = normalise(feats);
+    return n && cluster(n);
+  }
+
+  // One photo's dots as two numbers each (total light, centre), scaled to this photo's
+  // own white and background, plus which dots sit under a reflection
+  function normalise(feats) {
     // Background: blur lets a dot's own light spill into the gap right beside it, so
     // never trust a dot's surroundings to be darker than the code's typical background
-    const bgs = feats.map((f) => f.bg).sort((a, b) => a - b);
+    // Reflections brighten a patch of the code: judge each dot against the background
+    // around it (the darker gaps nearby, so a neighbour's spilled light does not count)
+    const near = neighbours();
+    const localBg = feats.map((_, i) => {
+      const v = near[i].map((j) => feats[j].bg).sort((a, b) => a - b);
+      return v[Math.floor(v.length * 0.3)];
+    });
+    const bgOf = (f, i) => Math.min(f.bg, localBg[i] + 0.25 * Math.max(0, f.bg - localBg[i]));
+    // Dots inside a blown-out reflection carry no information: leave them out
+    const bgs = [...localBg].sort((a, b) => a - b);
     const bgTypical = bgs[Math.floor(bgs.length / 2)];
-    const bgOf = (f) => Math.min(f.bg, bgTypical + 0.25 * Math.max(0, f.bg - bgTypical));
+    const glareAt = bgTypical + Math.max(40, (250 - bgTypical) * 0.45);
+    const unsure = feats.map((f, i) => localBg[i] > glareAt || f.peak >= 252);
     // White levels: typical of the brightest few dots (a short code may fill only ~1%)
     const topLevel = (vals) => {
       const s = vals.map((v) => Math.max(0, v)).sort((a, b) => b - a);
       const t = s.slice(0, Math.max(3, Math.ceil(s.length * 0.01)));
       return t[Math.floor(t.length / 2)] || 0;
     };
-    const eRaw = feats.map((f) => f.e - bgOf(f));
-    const cRaw = feats.map((f) => f.c - bgOf(f));
-    const whiteE = topLevel(eRaw), whiteC = topLevel(cRaw);
+    const eRaw = feats.map((f, i) => f.e - bgOf(f, i));
+    const cRaw = feats.map((f, i) => f.c - bgOf(f, i));
+    const sure = (vals) => vals.filter((_, i) => !unsure[i]);
+    if (sure(eRaw).length < eRaw.length * 0.4) return null; // most of the code is washed out
+    const whiteE = topLevel(sure(eRaw)), whiteC = topLevel(sure(cRaw));
     if (whiteE < 6 || whiteC < 12) return null; // no contrast: not a Qode, or far too dark
     const x = eRaw.map((v) => v / whiteE); // total light
     const y = cRaw.map((v) => v / whiteC); // centre
-
-    // 1. Three levels of total light (start: most dots empty, brightest filled)
-    const sorted = [...x].sort((a, b) => a - b);
-    let m = [sorted[Math.floor(sorted.length / 2)], 0, 1];
-    m[1] = (m[0] + m[2]) / 2;
-    const label = new Uint8Array(x.length);
-    for (let it = 0; it < 12; it++) {
-      const sum = [0, 0, 0], n = [0, 0, 0];
-      for (let i = 0; i < x.length; i++) {
-        let k = 0;
-        for (let j = 1; j < 3; j++) if (Math.abs(x[i] - m[j]) < Math.abs(x[i] - m[k])) k = j;
-        label[i] = k; sum[k] += x[i]; n[k]++;
-      }
-      m = m.map((v, k) => (n[k] ? sum[k] / n[k] : v));
-    }
-    if (m[2] - m[0] < 0.35) return null; // no clear filled dots
-    // A code may have no '1' dots: only keep rings if they really stand apart
-    if (m[1] - m[0] < 0.12 || m[2] - m[1] < 0.12) {
-      for (let i = 0; i < label.length; i++) if (label[i] === 1) label[i] = x[i] - m[0] < m[2] - x[i] ? 0 : 2;
-    }
-
-    // 2. Refine on total light and centre together (starts from this image's groups)
-    const prototypes = () => {
-      const sum = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
-      for (let i = 0; i < label.length; i++) { const s = sum[label[i]]; s[0] += x[i]; s[1] += y[i]; s[2]++; }
-      return sum.map((s) => (s[2] ? [s[0] / s[2], s[1] / s[2]] : null));
-    };
-    let proto = prototypes();
-    if (!proto[0] || !proto[2]) return null;
-    for (let it = 0; it < 6; it++) {
-      let moved = 0;
-      for (let i = 0; i < label.length; i++) {
-        let best = label[i], bd = Infinity;
-        for (let k = 0; k < 3; k++) {
-          if (!proto[k]) continue;
-          const d = (x[i] - proto[k][0]) ** 2 + (y[i] - proto[k][1]) ** 2;
-          if (d < bd) { bd = d; best = k; }
-        }
-        if (best !== label[i]) { label[i] = best; moved++; }
-      }
-      proto = prototypes();
-      if (!moved || !proto[0] || !proto[2]) break;
-    }
-    if (!proto[0] || !proto[2]) return null;
-    // Meanings must hold: filled brightest overall, rings in between
-    if (proto[1] && !(proto[2][0] > proto[1][0] && proto[1][0] > proto[0][0])) return null;
-    if (!proto[1]) proto[1] = [(proto[0][0] + proto[2][0]) / 2, proto[0][1] + 0.6]; // no rings seen: keep the state far away
-
-    let sq = 0;
-    for (let i = 0; i < label.length; i++) {
-      const p = proto[label[i]];
-      sq += (x[i] - p[0]) ** 2 + (y[i] - p[1]) ** 2;
-    }
-    const variance = Math.max(0.004, sq / (2 * label.length));
-    return { label, x, y, proto, variance };
+    return { x, y, unsure };
   }
 
-  // --- 4. Soft votes, text and checks ---
-
-  // Evidence for each state, summed over a dot's copies (log-likelihood, shared spread)
-  function voteGroup(dots, from, n) {
-    const L = [0, 0, 0];
-    for (let i = from; i < from + n; i++) {
-      for (let k = 0; k < 3; k++) {
-        const p = dots.proto[k];
-        L[k] -= ((dots.x[i] - p[0]) ** 2 + (dots.y[i] - p[1]) ** 2) / (2 * dots.variance);
-      }
+  // Several photos of the same code: a reflection sits somewhere else in each one, so
+  // every dot is taken from the photos where it is clear (the middle value of those)
+  function combine(list) {
+    const n = list[0].x.length, x = new Array(n), y = new Array(n), unsure = new Array(n);
+    const mid = (v) => { v.sort((a, b) => a - b); const k = v.length >> 1; return v.length % 2 ? v[k] : (v[k - 1] + v[k]) / 2; };
+    for (let i = 0; i < n; i++) {
+      let use = list.filter((d) => !d.unsure[i]);
+      unsure[i] = !use.length;
+      if (!use.length) use = list;
+      x[i] = mid(use.map((d) => d.x[i])); y[i] = mid(use.map((d) => d.y[i]));
     }
-    let best = 0;
-    for (let k = 1; k < 3; k++) if (L[k] > L[best]) best = k;
-    let second = -Infinity;
-    for (let k = 0; k < 3; k++) if (k !== best && L[k] > second) second = L[k];
-    return { trit: best, margin: L[best] - second };
+    return { x, y, unsure };
   }
 
-  function readText(dots, ecc) {
-    const vote = ecc === 1 ? 1 : ecc === 3 ? 5 : 3;
-    const n = dots.label.length;
-    let lastInk = -1; // last dot that is not empty
-    for (let i = n - 1; i >= 0; i--) if (dots.label[i] !== 0) { lastInk = i; break; }
-
-    let text = '', minMargin = Infinity, digits = [];
-    for (let g = 0; (g + 1) * vote <= n; g++) {
-      const v = voteGroup(dots, g * vote, vote);
-      if (v.margin < minMargin) minMargin = v.margin;
-      digits.push(v.trit);
-      if (digits.length < 5) continue;
-      const code = digits.reduce((acc, d) => acc * 3 + d, 0);
-      digits = [];
-      if (code === 0) {
-        const used = (g + 1) * vote;
-        // The real message must reach to where the dots turn empty; reading with the
-        // wrong complexity stops early on a chance "terminator".
-        if (lastInk >= used) return { text, ended: false, bad: true, ecc };
-        // With the right complexity a digit's copies nearly always look alike; grouped
-        // the wrong way they are unrelated dots. Only groups with ink count: empty
-        // padding agrees with itself under any grouping.
-        if (vote > 1) {
-          let same = 0, inked = 0;
-          for (let s = 0; s < used; s += vote) {
-            let ok = true, ink = false;
-            for (let k = 0; k < vote; k++) {
-              if (dots.label[s + k] !== 0) ink = true;
-              if (k && dots.label[s + k] !== dots.label[s]) ok = false;
-            }
-            if (!ink) continue;
-            inked++;
-            if (ok) same++;
-          }
-          if (!inked || same / inked < 0.8) return { text, ended: false, bad: true, ecc };
-        }
-        return { text, ended: true, minMargin, ecc };
-      }
-      if (code < 32 || code > 126) return { text, ended: false, bad: true, ecc };
-      text += String.fromCharCode(code);
+  // Two groups: filled and empty. Returns a bit per dot, plus how doubtful each one is.
+  function cluster({ x, y, unsure }) {
+    // Total light carries the most; the centre helps when the code is a little soft
+    const v = x.map((xi, i) => xi + 0.3 * y[i]);
+    const sure = v.filter((_, i) => !unsure[i]).sort((a, b) => a - b);
+    if (sure.length < 50) return null;
+    let m0 = sure[Math.floor(sure.length * 0.2)], m1 = sure[Math.floor(sure.length * 0.9)];
+    for (let it = 0; it < 10; it++) {
+      const t = (m0 + m1) / 2;
+      let s0 = 0, n0 = 0, s1 = 0, n1 = 0;
+      for (const val of sure) { if (val > t) { s1 += val; n1++; } else { s0 += val; n0++; } }
+      if (!n0 || !n1) return null;
+      m0 = s0 / n0; m1 = s1 / n1;
     }
-    return { text, ended: false, ecc };
+    if (m1 - m0 < 0.3) return null; // no clear filled dots: not a Qode, or far too soft
+    const t = (m0 + m1) / 2, half = (m1 - m0) / 2;
+    const bits = new Uint8Array(v.length), doubt = new Float64Array(v.length);
+    for (let i = 0; i < v.length; i++) {
+      bits[i] = v[i] > t ? 1 : 0;
+      doubt[i] = Math.max(0, 1 - Math.abs(v[i] - t) / half);
+    }
+    return { bits, doubt, unsure };
   }
 
-  // How clear the least clear digit must be, per complexity (calibrated on randomised
-  // photo distortions: with these, codes with copies never came back wrong). Codes
-  // without copies (complexity 1) cannot check themselves, so a misread there can look
-  // as clear as a good one; their bar is a compromise.
-  const NEED = { 1: 20, 2: 12, 3: 40 };
+  // --- 4. Text and checks ---
 
-  // Every digit of the message (and its terminator) must be clearly one state
-  function accept(r, strictness) {
-    return r.ended && !r.bad && r.text.length > 0 && r.minMargin >= NEED[r.ecc] * strictness;
-  }
+  // Reed-Solomon leaves this many parity bytes unused when the read is trustworthy
+  const NEED = { 1: 4, 2: 4, 3: 4 };
 
   // --- 5. Locate and read ---
 
@@ -777,19 +711,16 @@
 
   // Read text from dot measurements
   function readFeats(feats, opts, kind) {
-    const dots = classify(feats);
+    return readDots(classify(feats), opts, kind);
+  }
+  function readDots(dots, opts, kind) {
     if (!dots) return null;
+    const r = Format.decodeBits(dots.bits, dots.unsure, dots.doubt);
+    if (!r) return null;
     const strictness = opts.strictness ?? 1;
-    let best = null;
-    for (const ecc of opts.eccLevel ? [opts.eccLevel] : [2, 3, 1]) {
-      const r = readText(dots, ecc);
-      if (!accept(r, strictness)) continue;
-      // Prefer more copies per digit, then the clearest reading
-      const bonus = kind === 'perspective' ? 0.1 : 0;
-      const score = r.minMargin / NEED[ecc] + ecc + bonus;
-      if (!best || score > best.score) best = { ...r, score, kind };
-    }
-    return best;
+    if (r.spare < NEED[r.level] * strictness) return null;
+    const bonus = kind === 'perspective' ? 0.1 : 0;
+    return { text: r.text, ended: true, ecc: r.level, minMargin: r.spare, score: r.spare + bonus, kind };
   }
 
   function success(best, loc, map) {
@@ -855,5 +786,43 @@
     return success(best, { ...loc, anchors: bestLoc.anchors, foundCount: bestLoc.foundCount }, bestMap);
   }
 
-  return { decode, locate, findAnchors, _internals: { mappings, measure, classify, dataGrid } };
+  // A burst of photos taken while the code was in view (live scanning captures a few
+  // as soon as the code is spotted, then reads them at leisure). Each photo is mapped on
+  // its own; the dots are combined so reflections and blur in one photo do not matter.
+  function decodeMany(imgs, opts = {}) {
+    let firstLoc = null;
+    const per = [];
+    for (const img of imgs) {
+      const loc = locate(img);
+      if (!loc.found || loc.diameter < (opts.minDiameter || 120)) continue;
+      if (!firstLoc) firstLoc = loc;
+      // Each photo: its most precise mapping that gives usable dots
+      for (const m of loc.maps) {
+        const n = normalise(measure(img, m.map));
+        if (n) { per.push({ n, loc, map: m.map, kind: m.kind }); break; }
+      }
+    }
+    if (!per.length) return failure('No Qode anchors found', firstLoc || { foundCount: 0, anchors: {} });
+    // Every single photo, then all of them together
+    const tries = per.map((p) => ({ dots: cluster(p.n), p }));
+    if (per.length > 1) tries.push({ dots: cluster(combine(per.map((p) => p.n))), p: per[0], all: true });
+    // The photos confirm each other: a text counts when two readings agree (single photos
+    // or the combined one), or when one reading is very clear on its own
+    const base = Math.max(0.75, opts.strictness ?? 1);
+    const reads = [];
+    for (const t of tries) {
+      const r = readDots(t.dots, { ...opts, strictness: base }, t.p.kind);
+      if (r) reads.push({ r, t });
+    }
+    let best = null;
+    for (const x of reads) {
+      const agree = reads.filter((o) => o.r.text === x.r.text).length;
+      const clear = x.r.minMargin >= NEED[x.r.ecc] * (x.t.all ? 2 : 3);
+      if ((per.length === 1 ? x.r.minMargin >= NEED[x.r.ecc] : agree >= 2 || clear) && (!best || x.r.score > best.r.score)) best = { ...x, agree };
+    }
+    if (!best) return failure('Could not read the dots yet', firstLoc);
+    return success({ ...best.r, maps: best.agree }, best.t.p.loc, best.t.p.map);
+  }
+
+  return { decode, decodeMany, locate, findAnchors, _internals: { mappings, measure, classify, dataGrid } };
 });
